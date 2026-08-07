@@ -1,9 +1,7 @@
 @echo off
 echo Starting Django Backend Server...
-cd django_backend
-start cmd /k "..\venv\Scripts\activate.ps1 & python manage.py runserver"
+start cmd /k "venv\Scripts\activate.bat & python manage.py runserver"
 
 echo Backend server started on port 8000.
 echo Opening the frontend in your browser...
-cd ..
-start uploader.html
+start http://127.0.0.1:8000/
