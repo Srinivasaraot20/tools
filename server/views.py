@@ -4,9 +4,7 @@ import os
 from django.conf import settings
 
 def home(request):
-    html_path = os.path.join(settings.BASE_DIR.parent, 'uploader.html')
-    with open(html_path, 'r', encoding='utf-8') as f:
-        return HttpResponse(f.read())
+    return render(request, 'home.html')
 
 def about(request):
     return render(request, 'about.html')
