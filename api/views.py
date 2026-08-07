@@ -4,8 +4,7 @@ import json
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image
-import cv2
-import numpy as np
+
 
 @csrf_exempt
 def process_image(request):
@@ -40,6 +39,8 @@ def process_image(request):
             
         # Resizing
         if resize_algo == 'INTER_AREA':
+            import cv2
+            import numpy as np
             open_cv_image = np.array(img)
             open_cv_image = open_cv_image[:, :, ::-1].copy() # RGB to BGR
             resized = cv2.resize(open_cv_image, (width, height), interpolation=cv2.INTER_AREA)
