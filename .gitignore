@@ -16,4 +16,4 @@ venv.bak/
 *.png
 *.jpeg
 !CSC LOGO.png
-!django_backend/static/logo.png
+!static/logo.png
