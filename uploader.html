@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Specification Image Uploader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Inter', sans-serif; }
+        .upload-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; margin-bottom: 24px; transition: transform 0.2s; height: 100%; }
+        .upload-card:hover { transform: translateY(-2px); }
+        .drop-zone { border: 2px dashed #0b5ed7; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; background: #f1f6fd; transition: background 0.3s; }
+        .drop-zone:hover, .drop-zone.dragover { background: #e2edfb; }
+        .drop-zone.disabled { border-color: #ccc; background: #f8f9fa; cursor: not-allowed; opacity: 0.6; pointer-events: none; }
+        .preview-container { display: none; margin-top: 15px; }
+        .preview-img { max-width: 100%; border: 1px solid #ddd; border-radius: 4px; }
+        .settings-panel { display: none; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #e9ecef; }
+        .active-settings { background: #e8f5e9; border: 1px solid #c8e6c9; padding: 12px; border-radius: 8px; font-size: 0.85rem; color: #2e7d32; margin-top: 15px; }
+        .props-table { font-size: 0.85rem; }
+        
+        .download-center { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; margin-top: 10px; margin-bottom: 40px;}
+        .status-ready { color: #2e7d32; font-weight: 600; }
+        .status-waiting { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <h2 class="mb-4 fw-bold text-center">Document Processing Gateway</h2>
+        
+        <!-- Candidate Info Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="upload-card" style="height: auto;">
+                    <h5 class="fw-bold mb-3"><span class="material-icons-round align-text-bottom me-2 text-primary">person</span>Candidate Information</h5>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Candidate Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-lg border-2 shadow-sm" id="candidate-name" placeholder="Enter Candidate Full Name">
+                        <div class="form-text">This name will be used for all downloaded files and ZIP folder names.</div>
+                        <div id="name-validation-msg" class="text-danger small fw-medium mt-1">
+                            Please enter the candidate name (min 3 chars) before downloading files.
+                        </div>
+                    </div>
+
+                    <div class="mt-3 p-3 bg-light rounded-3 border" id="preview-section" style="opacity: 0.5;">
+                        <h6 class="fw-bold small text-muted mb-2">Download Preview</h6>
+                        <div class="row small font-monospace text-secondary" id="preview-list">
+                            <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">_Photo.jpg</span></div>
+                            <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">_Signature.jpg</span></div>
+                            <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">_Left_Thumb.jpg</span></div>
+                            <div class="col-md-6 mb-1"><strong>ZIP:</strong> <span id="prev-zip">.zip</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="upload-modules">
+            <!-- Will be populated by JS -->
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="download-center">
+                    <h4 class="fw-bold mb-4 border-bottom pb-2"><span class="material-icons-round align-text-bottom me-2 text-primary">download</span>Download Center</h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-3 text-muted">Processed Files Status</h6>
+                            <ul class="list-group list-group-flush mb-4" id="dc-status-list">
+                                <!-- Status list -->
+                            </ul>
+                            <div class="fw-bold text-primary mb-3" id="dc-count-summary">0 of 3 Files Ready</div>
+                        </div>
+                        <div class="col-md-6 d-flex flex-column justify-content-center align-items-center bg-light rounded-3 p-4 border">
+                            <button id="btn-bulk-download" class="btn btn-primary btn-lg rounded-pill px-4 shadow-sm w-100 mb-2" disabled onclick="downloadAllZip()">
+                                <span class="material-icons-round align-text-bottom me-1">archive</span> Download All Images (.ZIP)
+                            </button>
+                            <div id="zip-loading" class="text-muted small d-none"><div class="spinner-border spinner-border-sm me-1" role="status"></div> Creating ZIP...</div>
+                            <div id="zip-success" class="text-success small fw-medium mt-2 d-none">
+                                <span class="material-icons-round fs-6 align-text-bottom">check_circle</span> ZIP created successfully.<br>Downloaded: <span id="dl-zip-name"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/api/process-image/';
+
+        const configs = [
+            { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: '_Photo.jpg', defaults: { width: 132, height: 170, targetSize: 45, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
+            { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: '_Signature.jpg', defaults: { width: 170, height: 132, targetSize: 18, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+            { id: 'thumb-impression', title: '3. Upload Left Hand Thumb Impression', shortName: 'Thumb Impression', suffix: '_Left_Thumb.jpg', defaults: { width: 170, height: 132, targetSize: 18, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
+        ];
+
+        // Store current applied state
+        const state = {};
+        configs.forEach(c => { state[c.id] = { ...c.defaults }; });
+
+        // Store processed blobs for ZIP
+        const processedBlobs = {};
+        
+        // Candidate Name logic
+        let sanitizedCandidateName = "";
+        
+        function getSanitizedName(raw) {
+            // Remove invalid filename chars, collapse spaces
+            let cleaned = raw.replace(/[\\/:"*?<>|]/g, '').replace(/\s+/g, ' ');
+            return cleaned.trim();
+        }
+
+        const nameInput = document.getElementById('candidate-name');
+        nameInput.addEventListener('input', (e) => {
+            const raw = e.target.value;
+            sanitizedCandidateName = getSanitizedName(raw);
+            updateNameUI();
+        });
+
+        // Hard trim spaces on blur
+        nameInput.addEventListener('blur', (e) => {
+            e.target.value = getSanitizedName(e.target.value);
+            sanitizedCandidateName = e.target.value;
+            updateNameUI();
+        });
+
+        function updateNameUI() {
+            const isValid = sanitizedCandidateName.length >= 3;
+            
+            // update preview
+            const prefix = isValid ? sanitizedCandidateName : 'Candidate_Name';
+            document.getElementById('prev-photo').innerText = `${prefix}_Photo.jpg`;
+            document.getElementById('prev-sig').innerText = `${prefix}_Signature.jpg`;
+            document.getElementById('prev-thumb').innerText = `${prefix}_Left_Thumb.jpg`;
+            document.getElementById('prev-zip').innerText = `${prefix}.zip`;
+            
+            document.getElementById('preview-section').style.opacity = isValid ? '1' : '0.5';
+            
+            const validationMsg = document.getElementById('name-validation-msg');
+            if(isValid) {
+                validationMsg.classList.add('d-none');
+                nameInput.classList.remove('is-invalid');
+                nameInput.classList.add('is-valid');
+            } else {
+                validationMsg.classList.remove('d-none');
+                nameInput.classList.add('is-invalid');
+                nameInput.classList.remove('is-valid');
+            }
+            
+            updateDownloadCenter();
+        }
+
+        function createCard(c) {
+            return `
+            <div class="col-lg-4 col-md-6 mb-4">
+                <div class="upload-card" id="card-${c.id}">
+                    <h5 class="fw-bold mb-3">${c.title}</h5>
+                    
+                    <div id="unsaved-warning-${c.id}" class="alert alert-warning small d-none py-2 mb-3">
+                        <span class="fw-bold">Warning:</span> You have unsaved changes. Click 'Apply Changes' before processing.
+                    </div>
+
+                    <div class="drop-zone" id="drop-${c.id}">
+                        <span class="material-icons-round text-primary fs-1 mb-2">cloud_upload</span>
+                        <p class="mb-1 fw-medium">Drag & Drop Image Here</p>
+                        <p class="text-muted small mb-3">or</p>
+                        <button class="btn btn-primary btn-sm rounded-pill px-4" onclick="document.getElementById('input-${c.id}').click()">Browse Files</button>
+                        <input type="file" id="input-${c.id}" class="d-none" accept=".jpg,.jpeg,.png,.webp,.bmp,.tiff">
+                    </div>
+
+                    <div class="preview-container mt-3" id="preview-cont-${c.id}">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <p class="small fw-bold mb-1 text-muted">Original</p>
+                                <img id="orig-img-${c.id}" class="preview-img mb-2">
+                                <div id="orig-props-${c.id}" class="props-table text-muted"></div>
+                            </div>
+                            <div class="col-6">
+                                <p class="small fw-bold mb-1 text-success">Processed</p>
+                                <img id="proc-img-${c.id}" class="preview-img mb-2">
+                                <div id="proc-props-${c.id}" class="props-table text-success"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-outline-danger btn-sm flex-fill" onclick="resetCard('${c.id}')">Remove</button>
+                            <button class="btn btn-success btn-sm flex-fill d-none btn-dl-indiv" id="dl-${c.id}" onclick="downloadIndividual('${c.id}')">Download JPEG</button>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+                    
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="adv-toggle-${c.id}" onchange="toggleSettings('${c.id}')">
+                        <label class="form-check-label small fw-medium text-muted" for="adv-toggle-${c.id}">Edit Specifications</label>
+                    </div>
+                    
+                    <div class="active-settings" id="active-summary-${c.id}">
+                        <div class="fw-bold mb-1"><span class="material-icons-round fs-6 align-text-bottom">check_circle</span> Active Settings</div>
+                        <span id="summary-w-${c.id}">${c.defaults.width}</span> × <span id="summary-h-${c.id}">${c.defaults.height}</span> px<br>
+                        <span id="summary-s-${c.id}">${c.defaults.targetSize}</span> KB | <span id="summary-dpi-${c.id}">${c.defaults.dpi}</span> DPI<br>
+                        Algorithm: <span id="summary-algo-${c.id}">${c.defaults.algo}</span><br>
+                        Output: JPEG
+                    </div>
+
+                    <div class="settings-panel" id="settings-${c.id}">
+                        <h6 class="fw-bold mb-3 small text-muted border-bottom pb-2">Edit Specifications</h6>
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <label class="form-label mb-0">Width (px)</label>
+                                <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="w-${c.id}" value="${c.defaults.width}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-0">Height (px)</label>
+                                <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="h-${c.id}" value="${c.defaults.height}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-0">Target (KB)</label>
+                                <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="s-${c.id}" value="${c.defaults.targetSize}">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label mb-0">DPI</label>
+                                <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="dpi-${c.id}" value="${c.defaults.dpi}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label mb-0">Algorithm</label>
+                                <select class="form-select form-select-sm spec-input-${c.id}" id="algo-${c.id}">
+                                    <option value="Lanczos3" selected>Lanczos3</option>
+                                    <option value="Bicubic Sharper">Bicubic Sharper</option>
+                                    <option value="INTER_AREA">INTER_AREA</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="success-msg-${c.id}" class="text-success small fw-medium mt-2 d-none">
+                            <span class="material-icons-round fs-6 align-text-bottom">check</span> Specifications applied successfully.
+                        </div>
+
+                        <hr class="my-3">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="resetToDefault('${c.id}')">🔄 Reset</button>
+                            <button class="btn btn-secondary btn-sm flex-fill" onclick="cancelEdits('${c.id}')">↩️ Cancel</button>
+                            <button class="btn btn-primary btn-sm flex-fill" id="btn-apply-${c.id}" onclick="applyChanges('${c.id}')" disabled>✅ Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        document.getElementById('upload-modules').innerHTML = configs.map(createCard).join('');
+        
+        updateDownloadCenter();
+
+        configs.forEach(c => {
+            const drop = document.getElementById(`drop-${c.id}`);
+            const input = document.getElementById(`input-${c.id}`);
+            
+            drop.addEventListener('dragover', e => { e.preventDefault(); if(!drop.classList.contains('disabled')) drop.classList.add('dragover'); });
+            drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+            drop.addEventListener('drop', e => {
+                e.preventDefault();
+                drop.classList.remove('dragover');
+                if(!drop.classList.contains('disabled') && e.dataTransfer.files.length) {
+                    processImage(c.id, e.dataTransfer.files[0]);
+                }
+            });
+
+            input.addEventListener('change', e => {
+                if(e.target.files.length) processImage(c.id, e.target.files[0]);
+            });
+
+            document.querySelectorAll(`.spec-input-${c.id}`).forEach(el => {
+                el.addEventListener('input', () => checkUnsavedChanges(c.id));
+            });
+        });
+
+        function toggleSettings(id) {
+            const checked = document.getElementById(`adv-toggle-${id}`).checked;
+            document.getElementById(`settings-${id}`).style.display = checked ? 'block' : 'none';
+            document.getElementById(`active-summary-${id}`).style.display = checked ? 'none' : 'block';
+            if(!checked) cancelEdits(id);
+        }
+
+        function checkUnsavedChanges(id) {
+            const current = state[id];
+            const w = document.getElementById(`w-${id}`).value;
+            const h = document.getElementById(`h-${id}`).value;
+            const s = document.getElementById(`s-${id}`).value;
+            const dpi = document.getElementById(`dpi-${id}`).value;
+            const algo = document.getElementById(`algo-${id}`).value;
+
+            const hasChanged = w != current.width || h != current.height || s != current.targetSize || dpi != current.dpi || algo != current.algo;
+            
+            document.getElementById(`btn-apply-${id}`).disabled = !hasChanged;
+            
+            const drop = document.getElementById(`drop-${id}`);
+            const warning = document.getElementById(`unsaved-warning-${id}`);
+            
+            if(hasChanged) {
+                drop.classList.add('disabled');
+                document.getElementById(`input-${id}`).disabled = true;
+                warning.classList.remove('d-none');
+            } else {
+                drop.classList.remove('disabled');
+                document.getElementById(`input-${id}`).disabled = false;
+                warning.classList.add('d-none');
+            }
+            document.getElementById(`success-msg-${id}`).classList.add('d-none');
+        }
+
+        function applyChanges(id) {
+            const w = document.getElementById(`w-${id}`).value;
+            const h = document.getElementById(`h-${id}`).value;
+            const s = document.getElementById(`s-${id}`).value;
+            const dpi = document.getElementById(`dpi-${id}`).value;
+            const algo = document.getElementById(`algo-${id}`).value;
+
+            if(w <= 0 || h <= 0 || s <= 0 || dpi <= 0) {
+                alert("Please enter valid positive numbers for all specifications.");
+                return;
+            }
+
+            state[id] = { width: w, height: h, targetSize: s, dpi: dpi, algo: algo };
+            
+            document.getElementById(`summary-w-${id}`).innerText = w;
+            document.getElementById(`summary-h-${id}`).innerText = h;
+            document.getElementById(`summary-s-${id}`).innerText = s;
+            document.getElementById(`summary-dpi-${id}`).innerText = dpi;
+            document.getElementById(`summary-algo-${id}`).innerText = algo;
+
+            document.getElementById(`success-msg-${id}`).classList.remove('d-none');
+            checkUnsavedChanges(id);
+        }
+
+        function cancelEdits(id) {
+            const current = state[id];
+            document.getElementById(`w-${id}`).value = current.width;
+            document.getElementById(`h-${id}`).value = current.height;
+            document.getElementById(`s-${id}`).value = current.targetSize;
+            document.getElementById(`dpi-${id}`).value = current.dpi;
+            document.getElementById(`algo-${id}`).value = current.algo;
+            checkUnsavedChanges(id);
+        }
+
+        function resetToDefault(id) {
+            const def = configs.find(x => x.id === id).defaults;
+            document.getElementById(`w-${id}`).value = def.width;
+            document.getElementById(`h-${id}`).value = def.height;
+            document.getElementById(`s-${id}`).value = def.targetSize;
+            document.getElementById(`dpi-${id}`).value = def.dpi;
+            document.getElementById(`algo-${id}`).value = def.algo;
+            checkUnsavedChanges(id);
+        }
+
+        function resetCard(id) {
+            document.getElementById(`input-${id}`).value = '';
+            document.getElementById(`drop-${id}`).style.display = 'block';
+            document.getElementById(`preview-cont-${id}`).style.display = 'none';
+            
+            delete processedBlobs[id];
+            updateDownloadCenter();
+        }
+
+        async function processImage(id, file) {
+            if(!['image/jpeg','image/png','image/webp','image/bmp','image/tiff'].includes(file.type)) {
+                alert('Unsupported format. Please upload JPG, PNG, WEBP, BMP, or TIFF.');
+                return;
+            }
+
+            document.getElementById(`drop-${id}`).style.display = 'none';
+            document.getElementById(`preview-cont-${id}`).style.display = 'block';
+            
+            const origUrl = URL.createObjectURL(file);
+            document.getElementById(`orig-img-${id}`).src = origUrl;
+            
+            const origImg = new Image();
+            origImg.onload = () => {
+                document.getElementById(`orig-props-${id}`).innerHTML = `
+                    ${origImg.width}x${origImg.height}px<br>
+                    ${(file.size/1024).toFixed(1)} KB<br>
+                    ${file.type.split('/')[1].toUpperCase()}
+                `;
+            };
+            origImg.src = origUrl;
+
+            const fd = new FormData();
+            fd.append('image', file);
+            const current = state[id];
+            fd.append('width', current.width);
+            fd.append('height', current.height);
+            fd.append('targetSize', current.targetSize);
+            fd.append('dpi', current.dpi);
+            fd.append('resizeAlgorithm', current.algo);
+
+            document.getElementById(`proc-props-${id}`).innerHTML = 'Processing...';
+
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: fd });
+                if(!res.ok) throw new Error(await res.text());
+                
+                const blob = await res.blob();
+                
+                // save blob to internal state mapped by ID
+                processedBlobs[id] = {
+                    blob: blob,
+                    url: URL.createObjectURL(blob)
+                };
+                updateDownloadCenter();
+
+                document.getElementById(`proc-img-${id}`).src = processedBlobs[id].url;
+                
+                const w = res.headers.get('X-Processed-Width') || current.width;
+                const h = res.headers.get('X-Processed-Height') || current.height;
+                const dpi = res.headers.get('X-Processed-DPI') || current.dpi;
+                const q = res.headers.get('X-Processed-Quality') || 'N/A';
+                
+                document.getElementById(`proc-props-${id}`).innerHTML = `
+                    ${w}x${h}px @ ${dpi} DPI<br>
+                    ${(blob.size/1024).toFixed(1)} KB<br>
+                    JPEG (Q: ${q})
+                `;
+                
+                document.getElementById(`dl-${id}`).classList.remove('d-none');
+            } catch (err) {
+                console.error(err);
+                document.getElementById(`proc-props-${id}`).innerHTML = '<span class="text-danger">Failed</span>';
+                delete processedBlobs[id];
+                updateDownloadCenter();
+            }
+        }
+        
+        function downloadIndividual(id) {
+            if(sanitizedCandidateName.length < 3) {
+                alert("Please enter a valid candidate name (min 3 chars) first.");
+                document.getElementById('candidate-name').focus();
+                return;
+            }
+            
+            const cnf = configs.find(x => x.id === id);
+            const filename = sanitizedCandidateName + cnf.suffix;
+            
+            const a = document.createElement('a');
+            a.href = processedBlobs[id].url;
+            a.download = filename;
+            a.click();
+        }
+
+        function updateDownloadCenter() {
+            const listEl = document.getElementById('dc-status-list');
+            let readyCount = 0;
+            const isNameValid = sanitizedCandidateName.length >= 3;
+            
+            listEl.innerHTML = configs.map(c => {
+                const isReady = !!processedBlobs[c.id];
+                if(isReady) readyCount++;
+                
+                return `
+                <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 border-0">
+                    <span class="fw-medium">${c.shortName}</span>
+                    ${isReady 
+                        ? `<span class="status-ready"><span class="material-icons-round fs-6 align-text-bottom">check</span> Ready</span>`
+                        : `<span class="status-waiting small">Waiting...</span>`
+                    }
+                </li>`;
+            }).join('');
+
+            document.getElementById('dc-count-summary').innerText = `${readyCount} of 3 Files Ready`;
+            
+            const bulkBtn = document.getElementById('btn-bulk-download');
+            bulkBtn.disabled = (readyCount === 0 || !isNameValid);
+            
+            document.querySelectorAll('.btn-dl-indiv').forEach(btn => {
+                if(!isNameValid) btn.classList.add('disabled');
+                else btn.classList.remove('disabled');
+            });
+            
+            document.getElementById('zip-success').classList.add('d-none');
+        }
+
+        async function downloadAllZip() {
+            if(Object.keys(processedBlobs).length === 0 || sanitizedCandidateName.length < 3) return;
+            
+            const btn = document.getElementById('btn-bulk-download');
+            const loader = document.getElementById('zip-loading');
+            const success = document.getElementById('zip-success');
+            
+            btn.disabled = true;
+            loader.classList.remove('d-none');
+            success.classList.add('d-none');
+
+            try {
+                const zip = new JSZip();
+                const folder = zip.folder(sanitizedCandidateName);
+                
+                configs.forEach(c => {
+                    if(processedBlobs[c.id]) {
+                        folder.file(sanitizedCandidateName + c.suffix, processedBlobs[c.id].blob);
+                    }
+                });
+
+                const content = await zip.generateAsync({ type: "blob" });
+                
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                const zipFilename = `${sanitizedCandidateName}.zip`;
+                a.download = zipFilename;
+                a.click();
+                
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+                loader.classList.add('d-none');
+                document.getElementById('dl-zip-name').innerText = zipFilename;
+                success.classList.remove('d-none');
+            } catch (err) {
+                console.error('ZIP generation failed:', err);
+                alert("Failed to create ZIP archive.");
+                loader.classList.add('d-none');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

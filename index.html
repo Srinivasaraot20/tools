@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Admission Portal</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    
+    <!-- Cropper.css -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+    
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230b5ed7'><path d='M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z'/></svg>">
+</head>
+<body class="light-mode">
+    
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <span class="material-icons-round me-2">account_balance</span>
+                <strong>Skill Development Admission</strong>
+            </a>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-icon text-white d-flex align-items-center" id="theme-toggle" aria-label="Toggle Dark Mode">
+                    <span class="material-icons-round" id="theme-icon">dark_mode</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container form-container my-5 pt-5">
+        
+        <!-- View: Landing / Instructions -->
+        <div id="view-instructions" class="view-section active">
+            <div class="card p-5 border-0 shadow-lg rounded-4 glass-card">
+                <div class="text-center mb-4">
+                    <span class="material-icons-round text-primary display-1">description</span>
+                    <h1 class="h2 mt-3 fw-bold">Admission Guidelines</h1>
+                    <p class="text-muted">Please read the instructions carefully before filling the application.</p>
+                </div>
+                
+                <div class="alert alert-info border-0 shadow-sm d-flex align-items-start">
+                    <span class="material-icons-round me-3 mt-1">info</span>
+                    <div>
+                        <strong>Important:</strong> Keep your Aadhaar, ABC ID, and Educational Certificates ready before proceeding. Your session state is saved locally.
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-2">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 bg-light rounded-3 p-3">
+                            <h5 class="fw-bold d-flex align-items-center">
+                                <span class="material-icons-round text-warning me-2">photo_camera</span> Image Requirements
+                            </h5>
+                            <ul class="text-muted small mb-0">
+                                <li><strong>Photo:</strong> 132x170px, 5KB - 50KB (JPEG). White background, clear face.</li>
+                                <li><strong>Signature:</strong> 170x132px, 5KB - 20KB (JPEG). Blue/Black ink on white paper.</li>
+                                <li><strong>Thumb:</strong> 170x132px, 5KB - 20KB (JPEG). Clear impression on white paper.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 bg-light rounded-3 p-3">
+                            <h5 class="fw-bold d-flex align-items-center">
+                                <span class="material-icons-round text-success me-2">picture_as_pdf</span> Document Requirements
+                            </h5>
+                            <ul class="text-muted small mb-0">
+                                <li>Aadhaar Card, Community Certificate, and Supporting Docs must be in PDF format.</li>
+                                <li>ABC ID and Registration proofs can be PNG/JPEG.</li>
+                                <li>File size must be under 2MB per document.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-5">
+                    <div class="form-check d-inline-block text-start mb-4">
+                        <input class="form-check-input" type="checkbox" id="agree-instructions">
+                        <label class="form-check-label fw-medium" for="agree-instructions">
+                            I have read and understood all the instructions.
+                        </label>
+                    </div>
+                    <div>
+                        <button class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm fw-bold" id="btn-start-app" disabled>
+                            Proceed to Application <span class="material-icons-round align-middle ms-1">arrow_forward</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Multi-Step Form -->
+        <div id="view-form" class="view-section d-none">
+            
+            <!-- Sticky Stepper -->
+            <div class="stepper-wrapper mb-5 sticky-top bg-body pb-3 pt-3 shadow-sm px-3 rounded-4 z-2">
+                <div class="stepper-item active" data-step="1">
+                    <div class="step-counter">1</div>
+                    <div class="step-name">Personal</div>
+                </div>
+                <div class="stepper-item" data-step="2">
+                    <div class="step-counter">2</div>
+                    <div class="step-name">Education</div>
+                </div>
+                <div class="stepper-item" data-step="3">
+                    <div class="step-counter">3</div>
+                    <div class="step-name">Uploads</div>
+                </div>
+                <div class="stepper-item" data-step="4">
+                    <div class="step-counter">4</div>
+                    <div class="step-name">Review</div>
+                </div>
+            </div>
+
+            <!-- Form Card -->
+            <form id="application-form" class="needs-validation" novalidate>
+                
+                <!-- STEP 1: Personal Details -->
+                <div class="form-step active" id="step-1">
+                    <div class="card p-4 border-0 shadow-sm rounded-4 mb-4">
+                        <h4 class="mb-4 text-primary fw-bold border-bottom pb-2">Personal Details</h4>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Full Name *</label>
+                                <input type="text" class="form-control" name="fullName" required pattern="^[A-Za-z\s]{3,50}$">
+                                <div class="invalid-feedback">Please enter a valid name.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Date of Birth *</label>
+                                <input type="date" class="form-control" name="dob" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Gender *</label>
+                                <select class="form-select" name="gender" required>
+                                    <option value="" selected disabled>Select Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Transgender">Transgender</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Father's Name *</label>
+                                <input type="text" class="form-control" name="fatherName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Mother's Name *</label>
+                                <input type="text" class="form-control" name="motherName" required>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Religion *</label>
+                                <select class="form-select" name="religion" required>
+                                    <option value="" selected disabled>Select Religion</option>
+                                    <option value="Hindu">Hindu</option>
+                                    <option value="Muslim">Muslim</option>
+                                    <option value="Christian">Christian</option>
+                                    <option value="Sikh">Sikh</option>
+                                    <option value="Buddhist">Buddhist</option>
+                                    <option value="Jain">Jain</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Community Category *</label>
+                                <select class="form-select" name="community" required>
+                                    <option value="" selected disabled>Select Category</option>
+                                    <option value="General">General (UR)</option>
+                                    <option value="OBC">OBC</option>
+                                    <option value="SC">SC</option>
+                                    <option value="ST">ST</option>
+                                    <option value="EWS">EWS</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Aadhaar Number *</label>
+                                <input type="text" class="form-control" name="aadhaar" required pattern="^\d{12}$" maxlength="12">
+                                <div class="invalid-feedback">Enter 12 digit Aadhaar Number.</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Mobile Number *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">+91</span>
+                                    <input type="text" class="form-control" name="mobile" required pattern="^[6-9]\d{9}$" maxlength="10">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Alternative Mobile</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">+91</span>
+                                    <input type="text" class="form-control" name="altMobile" pattern="^[6-9]\d{9}$" maxlength="10">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Email Address *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Occupation</label>
+                                <input type="text" class="form-control" name="occupation">
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <h5 class="fw-bold text-secondary mb-3">Communication Address</h5>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Full Address *</label>
+                                <textarea class="form-control" name="address" rows="2" required></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">State *</label>
+                                <input type="text" class="form-control" name="state" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">District *</label>
+                                <input type="text" class="form-control" name="district" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Pincode *</label>
+                                <input type="text" class="form-control" name="pincode" required pattern="^\d{6}$" maxlength="6">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary rounded-pill px-4 btn-next">Next Step <span class="material-icons-round align-middle ms-1">arrow_forward</span></button>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Educational Details -->
+                <div class="form-step d-none" id="step-2">
+                    <div class="card p-4 border-0 shadow-sm rounded-4 mb-4">
+                        <h4 class="mb-4 text-primary fw-bold border-bottom pb-2">Educational Details</h4>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">ABC ID (Academic Bank of Credits) *</label>
+                                <input type="text" class="form-control" name="abcId" required pattern="^\d{12}$" maxlength="12">
+                                <div class="form-text">12-digit ABC ID required per NEP 2020.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Institution Name *</label>
+                                <input type="text" class="form-control" name="institution" required>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Program / Course *</label>
+                                <select class="form-select" name="program" required>
+                                    <option value="" selected disabled>Select Program</option>
+                                    <option value="O_LEVEL">O Level (IT)</option>
+                                    <option value="A_LEVEL">A Level (IT)</option>
+                                    <option value="B_LEVEL">B Level (IT)</option>
+                                    <option value="C_LEVEL">C Level (IT)</option>
+                                    <option value="CHM_O">CHM-O Level</option>
+                                    <option value="CCAC">CCAC</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Year of Admission *</label>
+                                <input type="number" class="form-control" name="admissionYear" min="2000" max="2026" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Registration Number *</label>
+                                <input type="text" class="form-control" name="regNumber" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Hall Ticket Number (Optional)</label>
+                                <input type="text" class="form-control" name="hallTicket">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4 btn-prev"><span class="material-icons-round align-middle me-1">arrow_back</span> Previous</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4 btn-next">Next Step <span class="material-icons-round align-middle ms-1">arrow_forward</span></button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Upload Documents -->
+                <div class="form-step d-none" id="step-3">
+                    <div class="alert alert-warning d-flex align-items-center rounded-3 mb-4 shadow-sm border-0">
+                        <span class="material-icons-round me-3 fs-3">warning</span>
+                        <div>
+                            <strong>Strict Image Processing Active:</strong> Uploaded images will be automatically validated for faces, background, and clarity. Images will be cropped and compressed to exact Govt specifications (JPEG, 5-50KB).
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mb-4">
+                        <!-- Photo Upload -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-1 upload-card">
+                                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                                    <div class="preview-box mb-3 bg-light rounded-3 d-flex align-items-center justify-content-center overflow-hidden" id="preview-photo" style="width: 132px; height: 170px; border: 2px dashed #ccc;">
+                                        <span class="material-icons-round text-muted" style="font-size: 48px;">person</span>
+                                    </div>
+                                    <h6 class="fw-bold">Passport Photo *</h6>
+                                    <p class="small text-muted mb-3">132x170 px | 5-50KB | JPG</p>
+                                    <input type="file" class="d-none file-input" id="input-photo" accept="image/png, image/jpeg, image/webp" data-type="photo">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill w-100" onclick="document.getElementById('input-photo').click()">Upload Photo</button>
+                                    <div class="validation-status mt-2 small w-100 text-start" id="status-photo"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Signature Upload -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-1 upload-card">
+                                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                                    <div class="preview-box mb-3 bg-light rounded-3 d-flex align-items-center justify-content-center overflow-hidden" id="preview-signature" style="width: 170px; height: 132px; border: 2px dashed #ccc;">
+                                        <span class="material-icons-round text-muted" style="font-size: 48px;">edit</span>
+                                    </div>
+                                    <h6 class="fw-bold">Signature *</h6>
+                                    <p class="small text-muted mb-3">170x132 px | 5-20KB | JPG</p>
+                                    <input type="file" class="d-none file-input" id="input-signature" accept="image/png, image/jpeg, image/webp" data-type="signature">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill w-100" onclick="document.getElementById('input-signature').click()">Upload Signature</button>
+                                    <div class="validation-status mt-2 small w-100 text-start" id="status-signature"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Thumb Upload -->
+                        <div class="col-md-4">
+                            <div class="card h-100 border-1 upload-card">
+                                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                                    <div class="preview-box mb-3 bg-light rounded-3 d-flex align-items-center justify-content-center overflow-hidden" id="preview-thumb" style="width: 170px; height: 132px; border: 2px dashed #ccc;">
+                                        <span class="material-icons-round text-muted" style="font-size: 48px;">fingerprint</span>
+                                    </div>
+                                    <h6 class="fw-bold">Thumb Impression *</h6>
+                                    <p class="small text-muted mb-3">170x132 px | 5-20KB | JPG</p>
+                                    <input type="file" class="d-none file-input" id="input-thumb" accept="image/png, image/jpeg, image/webp" data-type="thumb">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill w-100" onclick="document.getElementById('input-thumb').click()">Upload Thumb</button>
+                                    <div class="validation-status mt-2 small w-100 text-start" id="status-thumb"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="fw-bold mb-3">PDF Documents (Max 2MB each)</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Aadhaar Card (PDF) *</label>
+                            <input type="file" class="form-control" id="input-aadhaar" accept="application/pdf" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Community Certificate (PDF) *</label>
+                            <input type="file" class="form-control" id="input-community" accept="application/pdf" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Registration Form (PDF/Image) *</label>
+                            <input type="file" class="form-control" id="input-registration" accept="application/pdf, image/*" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">ABC ID Proof (PDF/Image) *</label>
+                            <input type="file" class="form-control" id="input-abc" accept="application/pdf, image/*" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Supporting Documents (PDF)</label>
+                            <input type="file" class="form-control" id="input-supporting" accept="application/pdf">
+                            <div class="form-text">Merge multiple documents into a single PDF if necessary.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4 btn-prev"><span class="material-icons-round align-middle me-1">arrow_back</span> Previous</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4 btn-next" id="btn-to-review">Review Details <span class="material-icons-round align-middle ms-1">visibility</span></button>
+                    </div>
+                </div>
+
+                <!-- STEP 4: Review -->
+                <div class="form-step d-none" id="step-4">
+                    <div class="card p-4 border-0 shadow-sm rounded-4 mb-4" id="review-container">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                    
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="declaration" required>
+                        <label class="form-check-label fw-medium" for="declaration">
+                            I hereby declare that all the information provided is true to the best of my knowledge. I understand that any false information may lead to rejection of my application.
+                        </label>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill px-4 btn-prev"><span class="material-icons-round align-middle me-1">edit</span> Edit Application</button>
+                        <button type="submit" class="btn btn-success btn-lg rounded-pill px-5 shadow" id="btn-submit">
+                            Submit Application <span class="material-icons-round align-middle ms-1">send</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- View: Progress / Loading -->
+        <div id="view-loading" class="view-section d-none">
+            <div class="card p-5 border-0 shadow-lg rounded-4 glass-card text-center text-white" style="background: linear-gradient(135deg, #0b5ed7, #0a369d);">
+                <h3 class="mb-4">Processing Application</h3>
+                <div class="progress mb-4" style="height: 25px; border-radius: 12.5px; background-color: rgba(255,255,255,0.2);">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" id="submission-progress" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                </div>
+                <div class="d-flex flex-column align-items-center">
+                    <ul class="list-unstyled text-start w-50" id="loading-steps">
+                        <li class="d-flex align-items-center mb-2"><span class="material-icons-round me-2 text-warning" id="status-1">hourglass_empty</span> Generating Application ID...</li>
+                        <li class="d-flex align-items-center mb-2 text-white-50"><span class="material-icons-round me-2" id="status-2">hourglass_empty</span> Compressing Images...</li>
+                        <li class="d-flex align-items-center mb-2 text-white-50"><span class="material-icons-round me-2" id="status-3">hourglass_empty</span> Uploading Files to Drive...</li>
+                        <li class="d-flex align-items-center text-white-50"><span class="material-icons-round me-2" id="status-4">hourglass_empty</span> Saving Records...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Success -->
+        <div id="view-success" class="view-section d-none">
+            <div class="card p-5 border-0 shadow-lg rounded-4 text-center">
+                <span class="material-icons-round text-success mb-3" style="font-size: 80px;">check_circle</span>
+                <h2 class="text-success fw-bold">Application Submitted Successfully!</h2>
+                <p class="text-muted lead mb-4">Your application has been securely recorded.</p>
+                
+                <div class="bg-light p-4 rounded-3 d-inline-block mx-auto mb-4 border border-success border-opacity-25" style="border-width: 2px !important; border-style: dashed !important;">
+                    <h5 class="text-muted mb-1">Application ID</h5>
+                    <h1 class="fw-bold text-primary tracking-wider" id="success-app-id">APP202600001</h1>
+                </div>
+                
+                <p>An email confirmation has been sent to <strong id="success-email"></strong>.</p>
+                
+                <div class="mt-4 d-flex justify-content-center gap-3">
+                    <button class="btn btn-outline-primary rounded-pill px-4" onclick="window.print()"><span class="material-icons-round align-middle me-1">print</span> Print Receipt</button>
+                    <button class="btn btn-primary rounded-pill px-4" id="btn-download-receipt"><span class="material-icons-round align-middle me-1">download</span> Download PDF</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Image Cropper Modal -->
+    <div class="modal fade" id="cropperModal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Crop & Validate Image</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0 bg-dark text-center" style="height: 60vh;">
+                    <img id="cropper-image" src="" alt="To Crop" style="max-width: 100%; max-height: 100%;">
+                </div>
+                <div class="modal-footer d-flex justify-content-between bg-light">
+                    <div class="text-muted small" id="cropper-info">Target: 132x170 (Photo)</div>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4" id="btn-crop-confirm">Crop & Process</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- MediaPipe Face Detection for validation -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    
+    <!-- Application Scripts -->
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="validator.js"></script>
+    <script src="compressor.js"></script>
+    <script src="cropper.js"></script>
+    <script src="upload.js"></script>
+    <script src="api.js"></script>
+    <script src="form.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
