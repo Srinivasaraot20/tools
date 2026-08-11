@@ -22,6 +22,84 @@
 {% block content %}
 <div class="container">
 
+    
+    <!-- Government Image Processing Module -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="upload-card shadow-lg border-success border-2" style="height: auto;">
+                <h4 class="fw-bold mb-3 text-success"><span class="material-icons-round align-text-bottom me-2">account_balance</span>Government Image Processing</h4>
+                <p class="text-muted">Process a folder of images. All images will be formatted automatically according to the selected type.</p>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Upload Type <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-lg border-2 shadow-sm" id="gov-upload-type">
+                            <option value="photo" selected>Upload Photo</option>
+                            <option value="signature">Upload Signature</option>
+                            <option value="thumb">Upload Thumb</option>
+                        </select>
+                        <div class="form-text">All valid images in the folder will be processed as this type.</div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold">Selected Folder <span class="text-danger">*</span></label>
+                        <div class="drop-zone border-success bg-light py-4" id="gov-drop-zone">
+                            <span class="material-icons-round text-success fs-2 mb-2">folder_open</span>
+                            <p class="mb-1 fw-bold">Drag & Drop Folder Here</p>
+                            <p class="text-muted small mb-3">or</p>
+                            <button class="btn btn-success btn-sm rounded-pill px-4" onclick="document.getElementById('gov-dir-input').click()">Select Folder</button>
+                            <input type="file" id="gov-dir-input" class="d-none" webkitdirectory directory multiple>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gov Dashboard -->
+                <div class="d-none" id="gov-dashboard">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-end mb-2">
+                        <h5 class="fw-bold mb-0">Processing Dashboard</h5>
+                        <div class="small fw-bold text-success" id="gov-progress-text">0 of 0 images processed</div>
+                    </div>
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="gov-progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    
+                    <div class="d-flex gap-2 mb-3">
+                        <button class="btn btn-primary btn-sm" id="btn-start-gov" onclick="startGovProcessing()">▶ Start Processing</button>
+                        <button class="btn btn-danger btn-sm d-none" id="btn-cancel-gov" onclick="cancelGovProcessing()">🛑 Cancel</button>
+                        <button class="btn btn-success btn-sm d-none" id="btn-dl-gov-zip" onclick="downloadGovZip()">📦 Download Processed ZIP</button>
+                    </div>
+
+                    <div class="row mb-3 small fw-medium">
+                        <div class="col-3">Total Files: <span id="gov-stat-total">0</span></div>
+                        <div class="col-3">Valid Images: <span id="gov-stat-images">0</span></div>
+                        <div class="col-3 text-success">Processed: <span id="gov-stat-success">0</span></div>
+                        <div class="col-3 text-danger">Skipped/Failed: <span id="gov-stat-skipped">0</span></div>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-bordered table-hover align-middle small bg-white">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Name / Candidate ID</th>
+                                    <th>Original File</th>
+                                    <th>Output File</th>
+                                    <th>Type</th>
+                                    <th>Dimensions</th>
+                                    <th>DPI</th>
+                                    <th>File Size</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gov-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Batch Processing Module -->
     <div class="row mb-5">
         <div class="col-12">
@@ -605,6 +683,271 @@
             btn.disabled = false;
         }
     }
+
+    
+    // --- Government Image Processing Logic ---
+    const MAX_GOVERNMENT_FILENAME_LENGTH = 14;
+    let govFiles = [];
+    let govProcessed = [];
+    let govCancel = false;
+
+    const govDrop = document.getElementById('gov-drop-zone');
+    const govInput = document.getElementById('gov-dir-input');
+
+    if(govDrop) {
+        govDrop.addEventListener('dragover', e => { e.preventDefault(); govDrop.classList.add('dragover'); });
+        govDrop.addEventListener('dragleave', () => govDrop.classList.remove('dragover'));
+        govDrop.addEventListener('drop', e => {
+            e.preventDefault();
+            govDrop.classList.remove('dragover');
+            handleGovFiles(e.dataTransfer.items);
+        });
+    }
+    
+    if(govInput) {
+        govInput.addEventListener('change', e => {
+            handleGovFiles(e.target.files, true);
+        });
+    }
+
+    function generateGovFilename(originalName, type) {
+        let base = originalName.substring(0, originalName.lastIndexOf('.'));
+        if(!base) base = originalName;
+
+        base = base.replace(/photo|sign|thumb/ig, '').trim();
+
+        const idMatch = base.match(/\b\d{8}\b/);
+        if (idMatch) {
+            return idMatch[0] + '.jpg';
+        }
+
+        const parts = base.replace(/[_-]/g, ' ').split(/\s+/).filter(p => p.length > 0);
+        let shortName = "";
+        if (parts.length >= 2) {
+            shortName = parts[0] + " " + parts[1].charAt(0).toUpperCase();
+        } else if (parts.length === 1) {
+            shortName = parts[0];
+        } else {
+            shortName = "Candidate";
+        }
+
+        let suffix = "";
+        if (type === 'photo') suffix = " Photo";
+        if (type === 'signature') suffix = " Sign";
+        if (type === 'thumb') suffix = " Thumb";
+
+        let finalName = shortName + suffix;
+
+        if (finalName.length > MAX_GOVERNMENT_FILENAME_LENGTH) {
+            finalName = finalName.substring(0, MAX_GOVERNMENT_FILENAME_LENGTH).trim();
+        }
+
+        return finalName + '.jpg';
+    }
+
+    async function handleGovFiles(items, fromInput=false) {
+        govFiles = [];
+        govProcessed = [];
+        document.getElementById('gov-dashboard').classList.remove('d-none');
+        document.getElementById('btn-start-gov').classList.remove('d-none');
+        document.getElementById('btn-dl-gov-zip').classList.add('d-none');
+        document.getElementById('gov-progress-bar').style.width = '0%';
+        document.getElementById('gov-progress-bar').classList.remove('bg-success');
+        
+        let totalCount = 0;
+        const validExts = ['jpg','jpeg','png','webp','bmp','tiff'];
+
+        const processFile = (file) => {
+            totalCount++;
+            const ext = file.name.split('.').pop().toLowerCase();
+            if(validExts.includes(ext)) {
+                govFiles.push({ file: file, status: 'Ready' });
+            } else {
+                govProcessed.push({
+                    originalName: file.name,
+                    status: 'Skipped (Unsupported)'
+                });
+            }
+        };
+
+        if (fromInput) {
+            for(let i=0; i<items.length; i++) {
+                processFile(items[i]);
+            }
+        } else {
+            const traverseFileTree = async (item) => {
+                if (item.isFile) {
+                    await new Promise(resolve => {
+                        item.file(file => {
+                            processFile(file);
+                            resolve();
+                        });
+                    });
+                } else if (item.isDirectory) {
+                    const dirReader = item.createReader();
+                    const entries = await new Promise(res => dirReader.readEntries(res));
+                    for (const entry of entries) {
+                        await traverseFileTree(entry);
+                    }
+                }
+            };
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i].webkitGetAsEntry();
+                if (item) await traverseFileTree(item);
+            }
+        }
+        
+        document.getElementById('gov-stat-total').innerText = totalCount;
+        document.getElementById('gov-stat-images').innerText = govFiles.length;
+        document.getElementById('gov-stat-success').innerText = "0";
+        document.getElementById('gov-stat-skipped').innerText = govProcessed.length;
+        renderGovTable();
+    }
+
+    function renderGovTable() {
+        const tbody = document.getElementById('gov-table-body');
+        let html = '';
+        
+        const allItems = [...govFiles, ...govProcessed];
+        
+        allItems.forEach(c => {
+            let statusClass = "text-muted";
+            const stat = c.status || 'Waiting';
+            if (stat === 'Success') statusClass = "text-success fw-bold";
+            if (stat.includes('Skipped') || stat.includes('Failed')) statusClass = "text-danger fw-bold";
+            if (stat === 'Processing...') statusClass = "text-primary fw-bold";
+            
+            html += `<tr>
+                <td class="fw-medium">${c.nameId || '-'}</td>
+                <td>${c.originalName || (c.file ? c.file.name : '-')}</td>
+                <td>${c.outputName || '-'}</td>
+                <td>${c.type || '-'}</td>
+                <td>${c.dimensions || '-'}</td>
+                <td>${c.dpi ? c.dpi + ' DPI' : '-'}</td>
+                <td>${c.fileSize || '-'}</td>
+                <td class="${statusClass}">${stat}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    async function startGovProcessing() {
+        if(govFiles.length === 0) return;
+        
+        const type = document.getElementById('gov-upload-type').value;
+        const cnfId = type === 'photo' ? 'person-photo' : (type === 'signature' ? 'signature' : 'thumb-impression');
+        const cnf = configs.find(x => x.id === cnfId);
+        
+        govCancel = false;
+        document.getElementById('btn-start-gov').classList.add('d-none');
+        document.getElementById('btn-cancel-gov').classList.remove('d-none');
+        document.getElementById('btn-cancel-gov').innerText = "🛑 Cancel";
+        document.getElementById('btn-dl-gov-zip').classList.add('d-none');
+        
+        let successCount = 0;
+        let failCount = 0;
+        
+        for (let i = 0; i < govFiles.length; i++) {
+            if(govCancel) break;
+            
+            const item = govFiles[i];
+            if(item.status === 'Success') continue;
+            
+            item.status = 'Processing...';
+            renderGovTable();
+            
+            try {
+                const fd = new FormData();
+                fd.append('image', item.file);
+                fd.append('width', cnf.defaults.width);
+                fd.append('height', cnf.defaults.height);
+                fd.append('targetSize', cnf.defaults.targetSize);
+                fd.append('threshold', cnf.defaults.threshold);
+                fd.append('ideal', cnf.defaults.ideal);
+                fd.append('dpi', cnf.defaults.dpi);
+                fd.append('resizeAlgorithm', cnf.defaults.algo);
+
+                const res = await fetch(API_URL, { method: 'POST', body: fd });
+                if(!res.ok) throw new Error("API Error");
+                
+                const blob = await res.blob();
+                
+                item.outputName = generateGovFilename(item.file.name, type);
+                item.nameId = item.outputName.replace('.jpg', '');
+                item.type = type.charAt(0).toUpperCase() + type.slice(1);
+                item.dimensions = `${res.headers.get('X-Processed-Width') || cnf.defaults.width} × ${res.headers.get('X-Processed-Height') || cnf.defaults.height}`;
+                item.dpi = res.headers.get('X-Processed-DPI') || cnf.defaults.dpi;
+                item.fileSize = (blob.size/1024).toFixed(1) + ' KB';
+                item.blob = blob;
+                item.status = 'Success';
+                successCount++;
+            } catch (err) {
+                item.status = 'Failed - ' + err.message;
+                failCount++;
+            }
+            
+            const pct = Math.round(((i + 1) / govFiles.length) * 100);
+            document.getElementById('gov-progress-bar').style.width = `${pct}%`;
+            document.getElementById('gov-progress-text').innerText = `${i + 1} of ${govFiles.length} images processed`;
+            document.getElementById('gov-stat-success').innerText = successCount;
+            
+            const totalFails = failCount + govProcessed.length;
+            document.getElementById('gov-stat-skipped').innerText = totalFails;
+            
+            renderGovTable();
+        }
+        
+        document.getElementById('btn-cancel-gov').classList.add('d-none');
+        document.getElementById('btn-dl-gov-zip').classList.remove('d-none');
+        document.getElementById('gov-progress-bar').classList.add('bg-primary');
+    }
+
+    function cancelGovProcessing() {
+        govCancel = true;
+        document.getElementById('btn-cancel-gov').innerText = "Cancelling...";
+    }
+
+    async function downloadGovZip() {
+        const btn = document.getElementById('btn-dl-gov-zip');
+        btn.disabled = true;
+        btn.innerText = "Creating Master ZIP...";
+        
+        const type = document.getElementById('gov-upload-type').value;
+        const folderName = type.charAt(0).toUpperCase() + type.slice(1);
+        const zipName = `Processed_${folderName}s.zip`;
+        
+        const zip = new JSZip();
+        const folder = zip.folder(folderName);
+        
+        const nameCounts = {};
+        
+        govFiles.forEach(c => {
+            if(c.status === 'Success' && c.blob) {
+                let finalName = c.outputName;
+                if(nameCounts[finalName]) {
+                    nameCounts[finalName]++;
+                    const parts = finalName.split('.jpg');
+                    finalName = `${parts[0]}_${nameCounts[finalName]}.jpg`;
+                } else {
+                    nameCounts[finalName] = 1;
+                }
+                folder.file(finalName, c.blob);
+            }
+        });
+        
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = zipName;
+        a.click();
+        
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        btn.disabled = false;
+        btn.innerHTML = "📦 Download Processed ZIP";
+    }
+
 
     // --- Batch Processing Logic ---
     let batchCandidates = {}; 
