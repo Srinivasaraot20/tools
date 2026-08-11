@@ -14,9 +14,8 @@ def process_image(request):
     try:
         width = int(request.POST.get('width', 132))
         height = int(request.POST.get('height', 170))
-        target_size_kb = int(request.POST.get('targetSize', 45))
-        threshold_kb = int(request.POST.get('threshold', target_size_kb + 5))
-        ideal_kb = int(request.POST.get('ideal', target_size_kb - 1))
+        min_size_kb = int(request.POST.get('minSize', 5))
+        max_size_kb = int(request.POST.get('maxSize', 20))
         dpi = int(request.POST.get('dpi', 270))
         resize_algo = request.POST.get('resizeAlgorithm', 'Lanczos3')
         
@@ -52,37 +51,46 @@ def process_image(request):
             img = img.resize((width, height), resample=Image.Resampling.LANCZOS)
             
         # Smart Compression Logic
-        threshold_bytes = threshold_kb * 1024
-        original_size_bytes = image_file.size
+        min_bytes = min_size_kb * 1024
+        max_bytes = max_size_kb * 1024
         
         quality = 100
         output_io = io.BytesIO()
-        img.save(output_io, format='JPEG', quality=quality, dpi=(dpi, dpi))
+        
+        # Try maximum possible quality with no subsampling to get highest possible file size
+        img.save(output_io, format='JPEG', quality=quality, dpi=(dpi, dpi), subsampling=0, optimize=False)
         size = output_io.tell()
         
         status = "unknown"
         
-        if original_size_bytes <= threshold_bytes:
-            # Case 1: Original upload is small
-            status = "original_small"
-        else:
-            # Case 2: Original is large
-            if size <= (ideal_kb + 1) * 1024:
-                # Naturally small at Q=100
-                status = "naturally_small"
-            else:
-                # Needs compression
-                while quality >= 10:
-                    output_io.seek(0)
-                    output_io.truncate()
-                    img.save(output_io, format='JPEG', quality=quality, dpi=(dpi, dpi))
-                    size = output_io.tell()
-                    
-                    if size <= (ideal_kb + 1) * 1024:
-                        break
+        if size > max_bytes:
+            # Need to compress to get below max_bytes
+            while quality >= 10:
+                temp_io = io.BytesIO()
+                img.save(temp_io, format='JPEG', quality=quality, dpi=(dpi, dpi), optimize=True)
+                temp_size = temp_io.tell()
+                
+                if temp_size <= max_bytes:
+                    output_io = temp_io
+                    size = temp_size
+                    if temp_size >= min_bytes:
+                        status = "optimized"
+                    else:
+                        status = "below_minimum"
+                    break
                         
-                    quality -= 2
-                status = "optimized"
+                quality -= 5
+                
+            if status == "unknown":
+                status = "exceeds_maximum"
+                
+        elif size < min_bytes:
+            # Even at Q=100, 4:4:4, unoptimized, the file is smaller than min_bytes.
+            status = "below_minimum"
+            
+        else:
+            # Size naturally falls in [min_bytes, max_bytes] at max quality.
+            status = "optimized"
             
         output_io.seek(0)
         

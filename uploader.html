@@ -373,10 +373,10 @@
 <script>
     const API_URL = '/api/process-image/';
 
-    const configs = [
-        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: '_Photo.jpg', defaults: { width: 132, height: 170, targetSize: 45, threshold: 50, ideal: 44, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: '_Signature.jpg', defaults: { width: 170, height: 132, targetSize: 18, threshold: 20, ideal: 17, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', suffix: '_Thumb.jpg', defaults: { width: 170, height: 132, targetSize: 18, threshold: 20, ideal: 17, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
+        const configs = [
+        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
     ];
 
     const state = {};
@@ -562,11 +562,12 @@
         const current = state[id];
         const w = document.getElementById(`w-${id}`).value;
         const h = document.getElementById(`h-${id}`).value;
-        const s = document.getElementById(`s-${id}`).value;
+        const min_s = document.getElementById(`min-s-${id}`).value;
+        const max_s = document.getElementById(`max-s-${id}`).value;
         const dpi = document.getElementById(`dpi-${id}`).value;
         const algo = document.getElementById(`algo-${id}`).value;
 
-        const hasChanged = w != current.width || h != current.height || s != current.targetSize || dpi != current.dpi || algo != current.algo;
+        const hasChanged = w != current.width || h != current.height || min_s != current.minSize || max_s != current.maxSize || dpi != current.dpi || algo != current.algo;
         
         document.getElementById(`btn-apply-${id}`).disabled = !hasChanged;
         
@@ -588,11 +589,12 @@
     function applyChanges(id) {
         const w = document.getElementById(`w-${id}`).value;
         const h = document.getElementById(`h-${id}`).value;
-        const s = document.getElementById(`s-${id}`).value;
+        const min_s = document.getElementById(`min-s-${id}`).value;
+        const max_s = document.getElementById(`max-s-${id}`).value;
         const dpi = document.getElementById(`dpi-${id}`).value;
         const algo = document.getElementById(`algo-${id}`).value;
 
-        if(w <= 0 || h <= 0 || s <= 0 || dpi <= 0) {
+        if(w <= 0 || h <= 0 || min_s <= 0 || max_s <= 0 || parseInt(min_s) >= parseInt(max_s) || dpi <= 0) {
             alert("Please enter valid positive numbers for all specifications.");
             return;
         }
@@ -673,9 +675,8 @@
         const current = state[id];
         fd.append('width', current.width);
         fd.append('height', current.height);
-        fd.append('targetSize', current.targetSize);
-        fd.append('threshold', current.threshold || (parseInt(current.targetSize) >= 40 ? parseInt(current.targetSize) + 5 : parseInt(current.targetSize) + 2));
-        fd.append('ideal', current.ideal || (parseInt(current.targetSize) - 1));
+        fd.append('minSize', current.minSize);
+        fd.append('maxSize', current.maxSize);
         fd.append('dpi', current.dpi);
         fd.append('resizeAlgorithm', current.algo);
 
@@ -701,25 +702,45 @@
             const q = res.headers.get('X-Processed-Quality') || 'N/A';
             const status = res.headers.get('X-Compression-Status');
             
-            const tHold = current.threshold || (parseInt(current.targetSize) >= 40 ? parseInt(current.targetSize) + 5 : parseInt(current.targetSize) + 2);
-            const tIdeal = current.ideal || (parseInt(current.targetSize) - 1);
-            const tgt = parseInt(current.targetSize);
-            
+                                                
+            const minK = current.minSize;
+            const maxK = current.maxSize;
+            const fSize = (blob.size/1024).toFixed(1);
             let statusMessage = '';
-            if (status === 'original_small') {
-                statusMessage = `<div class="text-success small mt-2">✓ Original file was ${tHold} KB or smaller. No compression was applied to preserve maximum quality.</div>`;
-            } else if (status === 'naturally_small') {
-                statusMessage = `<div class="text-success small mt-2">✓ Maximum image quality has been preserved. Due to the small output dimensions (${w} × ${h} px), the final JPEG size is naturally below ${tgt} KB and cannot be increased without adding unnecessary data.</div>`;
-            } else if (status === 'optimized') {
-                statusMessage = `<div class="text-success small mt-2">✓ Image optimized successfully to approximately ${tgt} KB.</div>`;
+            let isSuccess = false;
+            
+            if (status === 'below_minimum') {
+                statusMessage = `<div class="text-danger small mt-2">
+                    <strong>⚠ File size below minimum</strong><br>
+                    Current size: ${fSize} KB<br>
+                    Required: ${minK}–${maxK} KB
+                </div>`;
+            } else if (status === 'exceeds_maximum') {
+                statusMessage = `<div class="text-danger small mt-2">
+                    <strong>⚠ File size exceeds maximum</strong><br>
+                    Current size: ${fSize} KB<br>
+                    Required: ${minK}–${maxK} KB
+                </div>`;
+            } else {
+                isSuccess = true;
+                statusMessage = `<div class="text-success small mt-2">
+                    ✓ ${w} × ${h} px @ ${dpi} DPI<br>
+                    ✓ File size within ${minK}–${maxK} KB<br>
+                    ✓ JPEG
+                </div>`;
             }
             
             document.getElementById(`proc-props-${id}`).innerHTML = `
-                ${w}x${h}px @ ${dpi} DPI<br>
-                ${(blob.size/1024).toFixed(1)} KB<br>
-                JPEG (Q: ${q})
+                <div class="fw-bold fs-5 ${isSuccess ? 'text-dark' : 'text-danger'}">${fSize} KB</div>
+                <div class="text-muted small">JPEG (Q: ${q})</div>
                 ${statusMessage}
             `;
+            
+            if (!isSuccess) {
+                document.getElementById(`dl-${id}`).classList.add('d-none');
+            } else {
+                document.getElementById(`dl-${id}`).classList.remove('d-none');
+            }
             
             document.getElementById(`dl-${id}`).classList.remove('d-none');
         } catch (err) {
@@ -988,14 +1009,16 @@
                 fd.append('image', item.file);
                 fd.append('width', cnf.defaults.width);
                 fd.append('height', cnf.defaults.height);
-                fd.append('targetSize', cnf.defaults.targetSize);
-                fd.append('threshold', cnf.defaults.threshold);
-                fd.append('ideal', cnf.defaults.ideal);
+                fd.append('minSize', cnf.defaults.minSize);
+                fd.append('maxSize', cnf.defaults.maxSize);
                 fd.append('dpi', cnf.defaults.dpi);
                 fd.append('resizeAlgorithm', cnf.defaults.algo);
 
                 const res = await fetch(API_URL, { method: 'POST', body: fd });
                 if(!res.ok) throw new Error("API Error");
+                const status = res.headers.get('X-Compression-Status');
+                if (status === 'below_minimum') throw new Error("File size below minimum");
+                if (status === 'exceeds_maximum') throw new Error("File size exceeds maximum");
                 
                 const blob = await res.blob();
                 
@@ -1201,6 +1224,9 @@
 
         const res = await fetch(API_URL, { method: 'POST', body: fd });
         if(!res.ok) throw new Error("API Error");
+                const status = res.headers.get('X-Compression-Status');
+                if (status === 'below_minimum') throw new Error("File size below minimum");
+                if (status === 'exceeds_maximum') throw new Error("File size exceeds maximum");
         return await res.blob();
     }
     
