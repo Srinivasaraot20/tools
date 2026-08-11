@@ -11,7 +11,7 @@
     <meta name="description" content="Council for Skills and Competencies (CSC) Official Document Processing Portal. Resize, compress, optimize and convert candidate photographs, signatures and thumb impressions according to official government and institutional specifications. Supports JPEG conversion, DPI adjustment, image compression and high-quality image optimization.">
     
     <!-- Extended SEO Keywords -->
-    <meta name="keywords" content="Council for Skills and Competencies, CSC, CSC Portal, CSC Image Processing, CSC Photo Tool, CSC Document Portal, Document Processing Portal, Official Photo Processor, Government Photo Resize, Passport Photo Resize, Candidate Photo Resize, Online Photo Resizer, Photo Compression Tool, Photo Size Reducer, Image Compressor, Image Optimizer, JPEG Converter, JPG Converter, PNG to JPEG, WEBP to JPEG, TIFF to JPEG, Photo DPI Converter, Image DPI Changer, 270 DPI Photo, 180 DPI Signature, Official Signature Resize, Signature Compressor, Thumb Impression Processor, Left Thumb Impression, Fingerprint Image Tool, Government Recruitment, Skill Development, Skills Certification, Competency Assessment, Examination Portal, Candidate Registration, Application Photo Upload, Government Image Specifications, Document Verification, Photo Upload Tool, Online JPEG Converter, Photo Quality Enhancer, Passport Size Photo Maker, High Quality Image Compression, Lanczos Image Resizer, Professional Image Processing, Bulk Image Processing, Batch Photo Resize, Official Document Upload, AI Image Optimization, Photo Processing Software, Image Compression Portal, Skill Certification Portal, Digital Document Processing, Employment Portal, Admission Portal, Recruitment Portal, Certificate Portal, Online Image Editing, Photo Size Converter, Document Upload System, Photo Validator, Official Application Portal">
+    <meta name="keywords" content="Council for Skills and Competencies, CSC, CSC Portal, CSC Image Processing, CSC Photo Tool, CSC Document Portal, Document Processing Portal, Official Photo Processor, Government Photo Resize, Passport Photo Resize, Candidate Photo Resize, Online Photo Resizer, Photo Compression Tool, Photo Size Reducer, Image Compressor, Image Optimizer, JPEG Converter, JPG Converter, PNG to JPEG, WEBP to JPEG, TIFF to JPEG, Photo DPI Converter, Image DPI Changer, 270 DPI Photo, 180 DPI Signature, Official Signature Resize, Signature Compressor, Thumb Impression Processor, Thumb Impression, Fingerprint Image Tool, Government Recruitment, Skill Development, Skills Certification, Competency Assessment, Examination Portal, Candidate Registration, Application Photo Upload, Government Image Specifications, Document Verification, Photo Upload Tool, Online JPEG Converter, Photo Quality Enhancer, Passport Size Photo Maker, High Quality Image Compression, Lanczos Image Resizer, Professional Image Processing, Bulk Image Processing, Batch Photo Resize, Official Document Upload, AI Image Optimization, Photo Processing Software, Image Compression Portal, Skill Certification Portal, Digital Document Processing, Employment Portal, Admission Portal, Recruitment Portal, Certificate Portal, Online Image Editing, Photo Size Converter, Document Upload System, Photo Validator, Official Application Portal">
     
     <!-- Open Graph -->
     <meta property="og:type" content="website">
@@ -220,7 +220,7 @@
                     <div class="row small font-monospace text-secondary" id="preview-list">
                         <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">_Photo.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">_Signature.jpg</span></div>
-                        <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">_Left_Thumb.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">_Thumb.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>ZIP:</strong> <span id="prev-zip">.zip</span></div>
                     </div>
                 </div>
@@ -298,7 +298,7 @@
     const configs = [
         { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: '_Photo.jpg', defaults: { width: 132, height: 170, targetSize: 45, threshold: 50, ideal: 44, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
         { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: '_Signature.jpg', defaults: { width: 170, height: 132, targetSize: 18, threshold: 20, ideal: 17, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'thumb-impression', title: '3. Upload Left Hand Thumb Impression', shortName: 'Thumb Impression', suffix: '_Left_Thumb.jpg', defaults: { width: 170, height: 132, targetSize: 18, threshold: 20, ideal: 17, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
+        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', suffix: '_Thumb.jpg', defaults: { width: 170, height: 132, targetSize: 18, threshold: 20, ideal: 17, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
     ];
 
     const state = {};
@@ -332,7 +332,7 @@
         const prefix = isValid ? sanitizedCandidateName : 'Candidate_Name';
         document.getElementById('prev-photo').innerText = `${prefix}_Photo.jpg`;
         document.getElementById('prev-sig').innerText = `${prefix}_Signature.jpg`;
-        document.getElementById('prev-thumb').innerText = `${prefix}_Left_Thumb.jpg`;
+        document.getElementById('prev-thumb').innerText = `${prefix}_Thumb.jpg`;
         document.getElementById('prev-zip').innerText = `${prefix}.zip`;
         
         document.getElementById('preview-section').style.opacity = isValid ? '1' : '0.5';
@@ -774,7 +774,7 @@
         
         const photoRegex = /photo|person|image|profile|passport|pic/i;
         const signRegex = /signature|sign|sign_image|sig/i;
-        const thumbRegex = /thumb|left_thumb|thumb_impression|fingerprint|thumbprint/i;
+        const thumbRegex = /thumb|thumb|thumb_impression|fingerprint|thumbprint/i;
         const validExts = ['jpg','jpeg','png','webp','bmp','tiff'];
 
         const processFile = (file, candidateName) => {
@@ -941,7 +941,7 @@
                 const folder = zip.folder(c.name);
                 if(c.processed.photo) folder.file(`${c.name}_Photo.jpg`, c.processed.photo);
                 if(c.processed.sign) folder.file(`${c.name}_Signature.jpg`, c.processed.sign);
-                if(c.processed.thumb) folder.file(`${c.name}_Left_Thumb.jpg`, c.processed.thumb);
+                if(c.processed.thumb) folder.file(`${c.name}_Thumb.jpg`, c.processed.thumb);
             }
         });
         
