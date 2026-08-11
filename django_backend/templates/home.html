@@ -710,10 +710,11 @@
         });
     }
 
-    function generateGovFilename(originalName, type) {
+        function generateGovFilename(originalName, type) {
         let base = originalName.substring(0, originalName.lastIndexOf('.'));
         if(!base) base = originalName;
 
+        // Remove unnecessary image-type words
         base = base.replace(/photo|sign|thumb/ig, '').trim();
 
         const idMatch = base.match(/\b\d{8}\b/);
@@ -721,27 +722,22 @@
             return idMatch[0] + '.jpg';
         }
 
-        const parts = base.replace(/[_-]/g, ' ').split(/\s+/).filter(p => p.length > 0);
-        let shortName = "";
-        if (parts.length >= 2) {
-            shortName = parts[0] + " " + parts[1].charAt(0).toUpperCase();
-        } else if (parts.length === 1) {
-            shortName = parts[0];
-        } else {
-            shortName = "Candidate";
+        // Clean separators
+        let shortName = base.replace(/[_-]/g, ' ').trim();
+        if (!shortName) shortName = "Candidate";
+
+        // Take first 7 characters
+        if (shortName.length > 7) {
+            shortName = shortName.substring(0, 7).trim();
         }
 
+        // Add the COMPLETE type
         let suffix = "";
         if (type === 'photo') suffix = " Photo";
         if (type === 'signature') suffix = " Sign";
         if (type === 'thumb') suffix = " Thumb";
 
         let finalName = shortName + suffix;
-
-        if (finalName.length > MAX_GOVERNMENT_FILENAME_LENGTH) {
-            finalName = finalName.substring(0, MAX_GOVERNMENT_FILENAME_LENGTH).trim();
-        }
-
         return finalName + '.jpg';
     }
 
