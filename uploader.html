@@ -703,32 +703,35 @@
             const status = res.headers.get('X-Compression-Status');
             
                                                 
-            const minK = current.minSize;
-            const maxK = current.maxSize;
-            const fSize = (blob.size/1024).toFixed(1);
+            // Compute actual size and enforce strict 5–20 KB limits using bytes
+            const minBytes = current.minSize * 1024;
+            const maxBytes = current.maxSize * 1024;
+            const actualSize = blob.size;
+            const fSize = (actualSize / 1024).toFixed(1);
             let statusMessage = '';
             let isSuccess = false;
-            
-            if (status === 'below_minimum') {
+
+            if (actualSize < minBytes) {
                 statusMessage = `<div class="text-danger small mt-2">
                     <strong>⚠ File size below minimum</strong><br>
                     Current size: ${fSize} KB<br>
-                    Required: ${minK}–${maxK} KB
+                    Required: ${current.minSize}–${current.maxSize} KB
                 </div>`;
-            } else if (status === 'exceeds_maximum') {
+            } else if (actualSize > maxBytes) {
                 statusMessage = `<div class="text-danger small mt-2">
                     <strong>⚠ File size exceeds maximum</strong><br>
                     Current size: ${fSize} KB<br>
-                    Required: ${minK}–${maxK} KB
+                    Required: ${current.minSize}–${current.maxSize} KB
                 </div>`;
             } else {
                 isSuccess = true;
                 statusMessage = `<div class="text-success small mt-2">
                     ✓ ${w} × ${h} px @ ${dpi} DPI<br>
-                    ✓ File size within ${minK}–${maxK} KB<br>
+                    ✓ File size within ${current.minSize}–${current.maxSize} KB<br>
                     ✓ JPEG
                 </div>`;
             }
+
             
             document.getElementById(`proc-props-${id}`).innerHTML = `
                 <div class="fw-bold fs-5 ${isSuccess ? 'text-dark' : 'text-danger'}">${fSize} KB</div>
@@ -741,8 +744,8 @@
             } else {
                 document.getElementById(`dl-${id}`).classList.remove('d-none');
             }
-            
-            document.getElementById(`dl-${id}`).classList.remove('d-none');
+            // Removed unconditional removal of d-none to ensure button stays hidden when invalid
+
         } catch (err) {
             console.error(err);
             document.getElementById(`proc-props-${id}`).innerHTML = '<span class="text-danger">Failed</span>';
@@ -869,28 +872,23 @@
     }
 
         function generateGovernmentFilename(originalName, type) {
-        if (!originalName) originalName = "";
-        let base = originalName;
-        const lastDot = base.lastIndexOf('.');
-        if (lastDot > 0) base = base.substring(0, lastDot);
-        base = base.replace(/photo|sign|thumb|signature/ig, '').trim();
-        const idMatch = base.match(/\b\d{8}\b/);
-        if (idMatch) {
-            return idMatch[0] + '.jpg';
+            if (!originalName) originalName = "";
+            let base = originalName;
+            const lastDot = base.lastIndexOf('.');
+            if (lastDot > 0) base = base.substring(0, lastDot);
+            // Remove type keywords and trim
+            base = base.replace(/photo|sign|thumb|signature/ig, '').trim();
+            // Remove all whitespace to count meaningful characters
+            const compact = base.replace(/\s+/g, '');
+            // Take first 7 characters of compact string
+            const shortBase = compact.slice(0, 7);
+            let suffix = "";
+            if (type === 'photo' || type === 'person-photo') suffix = " Photo";
+            if (type === 'signature') suffix = " Sign";
+            if (type === 'thumb' || type === 'thumb-impression') suffix = " Thumb";
+            if (!shortBase) return suffix.trim() + '.jpg';
+            return shortBase + suffix + '.jpg';
         }
-        let shortName = base.replace(/[_-]/g, ' ').trim();
-        if (!shortName) {
-            shortName = "";
-        } else if (shortName.length > 7) {
-            shortName = shortName.substring(0, 7).trim();
-        }
-        let suffix = "";
-        if (type === 'photo' || type === 'person-photo') suffix = " Photo";
-        if (type === 'signature') suffix = " Sign";
-        if (type === 'thumb' || type === 'thumb-impression') suffix = " Thumb";
-        if (!shortName) return suffix.trim() + '.jpg';
-        return shortName + suffix + '.jpg';
-    }
 
     async function handleGovFiles(items, fromInput=false) {
         govFiles = [];
