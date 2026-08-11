@@ -187,9 +187,9 @@
                 <div class="mt-3 p-3 bg-light rounded-3 border" id="preview-section" style="opacity: 0.5;">
                     <h6 class="fw-bold small text-muted mb-2">Download Preview</h6>
                     <div class="row small font-monospace text-secondary" id="preview-list">
-                        <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">_Photo.jpg</span></div>
-                        <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">_Signature.jpg</span></div>
-                        <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">_Thumb.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">Photo.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">Sign.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">Thumb.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>ZIP:</strong> <span id="prev-zip">.zip</span></div>
                     </div>
                 </div>
@@ -268,11 +268,10 @@
     function updateNameUI() {
         const isValid = sanitizedCandidateName.length >= 3;
         
-        const prefix = isValid ? sanitizedCandidateName : 'Candidate_Name';
-        document.getElementById('prev-photo').innerText = `${prefix}_Photo.jpg`;
-        document.getElementById('prev-sig').innerText = `${prefix}_Signature.jpg`;
-        document.getElementById('prev-thumb').innerText = `${prefix}_Thumb.jpg`;
-        document.getElementById('prev-zip').innerText = `${prefix}.zip`;
+        document.getElementById('prev-photo').innerText = generateGovernmentFilename(sanitizedCandidateName, 'photo');
+        document.getElementById('prev-sig').innerText = generateGovernmentFilename(sanitizedCandidateName, 'signature');
+        document.getElementById('prev-thumb').innerText = generateGovernmentFilename(sanitizedCandidateName, 'thumb');
+        document.getElementById('prev-zip').innerText = sanitizedCandidateName ? `${sanitizedCandidateName}.zip` : '.zip';
         
         document.getElementById('preview-section').style.opacity = isValid ? '1' : '0.5';
         
@@ -599,8 +598,7 @@
             return;
         }
         
-        const cnf = configs.find(x => x.id === id);
-        const filename = sanitizedCandidateName + cnf.suffix;
+        const filename = generateGovernmentFilename(sanitizedCandidateName, id);
         
         const a = document.createElement('a');
         a.href = processedBlobs[id].url;
@@ -710,35 +708,28 @@
         });
     }
 
-        function generateGovFilename(originalName, type) {
-        let base = originalName.substring(0, originalName.lastIndexOf('.'));
-        if(!base) base = originalName;
-
-        // Remove unnecessary image-type words
-        base = base.replace(/photo|sign|thumb/ig, '').trim();
-
+        function generateGovernmentFilename(originalName, type) {
+        if (!originalName) originalName = "";
+        let base = originalName;
+        const lastDot = base.lastIndexOf('.');
+        if (lastDot > 0) base = base.substring(0, lastDot);
+        base = base.replace(/photo|sign|thumb|signature/ig, '').trim();
         const idMatch = base.match(/\b\d{8}\b/);
         if (idMatch) {
             return idMatch[0] + '.jpg';
         }
-
-        // Clean separators
         let shortName = base.replace(/[_-]/g, ' ').trim();
-        if (!shortName) shortName = "Candidate";
-
-        // Take first 7 characters
-        if (shortName.length > 7) {
+        if (!shortName) {
+            shortName = "";
+        } else if (shortName.length > 7) {
             shortName = shortName.substring(0, 7).trim();
         }
-
-        // Add the COMPLETE type
         let suffix = "";
-        if (type === 'photo') suffix = " Photo";
+        if (type === 'photo' || type === 'person-photo') suffix = " Photo";
         if (type === 'signature') suffix = " Sign";
-        if (type === 'thumb') suffix = " Thumb";
-
-        let finalName = shortName + suffix;
-        return finalName + '.jpg';
+        if (type === 'thumb' || type === 'thumb-impression') suffix = " Thumb";
+        if (!shortName) return suffix.trim() + '.jpg';
+        return shortName + suffix + '.jpg';
     }
 
     async function handleGovFiles(items, fromInput=false) {
@@ -869,7 +860,7 @@
                 
                 const blob = await res.blob();
                 
-                item.outputName = generateGovFilename(item.file.name, type);
+                item.outputName = generateGovernmentFilename(item.file.name, type);
                 item.nameId = item.outputName.replace('.jpg', '');
                 item.type = type.charAt(0).toUpperCase() + type.slice(1);
                 item.dimensions = `${res.headers.get('X-Processed-Width') || cnf.defaults.width} × ${res.headers.get('X-Processed-Height') || cnf.defaults.height}`;
