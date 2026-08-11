@@ -685,32 +685,22 @@
         try {
             const res = await fetch(API_URL, { method: 'POST', body: fd });
             if(!res.ok) throw new Error(await res.text());
-            
+
             const blob = await res.blob();
-            
-            processedBlobs[id] = {
-                blob: blob,
-                url: URL.createObjectURL(blob)
-            };
-            updateDownloadCenter();
 
-            document.getElementById(`proc-img-${id}`).src = processedBlobs[id].url;
-            
-            const w = res.headers.get('X-Processed-Width') || current.width;
-            const h = res.headers.get('X-Processed-Height') || current.height;
-            const dpi = res.headers.get('X-Processed-DPI') || current.dpi;
-            const q = res.headers.get('X-Processed-Quality') || 'N/A';
-            const status = res.headers.get('X-Compression-Status');
-            
-                                                
-            // Compute actual size and enforce strict 5–20 KB limits using bytes
-            const minBytes = current.minSize * 1024;
-            const maxBytes = current.maxSize * 1024;
-            const actualSize = blob.size;
-            const fSize = (actualSize / 1024).toFixed(1);
+            const w   = res.headers.get('X-Processed-Width')  || current.width;
+            const h   = res.headers.get('X-Processed-Height') || current.height;
+            const dpi = res.headers.get('X-Processed-DPI')    || current.dpi;
+            const q   = res.headers.get('X-Processed-Quality') || 'N/A';
+
+            // ── Strict byte-level size validation ───────────────────────────
+            const minBytes  = current.minSize * 1024;   // e.g. 5120
+            const maxBytes  = current.maxSize * 1024;   // e.g. 20480
+            const actualSize = blob.size;               // real bytes from backend
+            const fSize     = (actualSize / 1024).toFixed(1);
+            const isSuccess = (actualSize >= minBytes && actualSize <= maxBytes);
+
             let statusMessage = '';
-            let isSuccess = false;
-
             if (actualSize < minBytes) {
                 statusMessage = `<div class="text-danger small mt-2">
                     <strong>⚠ File size below minimum</strong><br>
@@ -724,7 +714,6 @@
                     Required: ${current.minSize}–${current.maxSize} KB
                 </div>`;
             } else {
-                isSuccess = true;
                 statusMessage = `<div class="text-success small mt-2">
                     ✓ ${w} × ${h} px @ ${dpi} DPI<br>
                     ✓ File size within ${current.minSize}–${current.maxSize} KB<br>
@@ -732,24 +721,52 @@
                 </div>`;
             }
 
-            
+            // ── Update processed-image preview ──────────────────────────────
+            if (isSuccess) {
+                // Only store blob when file is genuinely valid
+                processedBlobs[id] = {
+                    blob : blob,
+                    url  : URL.createObjectURL(blob),
+                    valid: true
+                };
+            } else {
+                // Invalid – revoke any previous valid blob for this id
+                if (processedBlobs[id] && processedBlobs[id].url) {
+                    URL.revokeObjectURL(processedBlobs[id].url);
+                }
+                delete processedBlobs[id];
+            }
+
+            // ── Show preview image (even for invalid – helps user see result) ─
+            const previewUrl = isSuccess ? processedBlobs[id].url : URL.createObjectURL(blob);
+            document.getElementById(`proc-img-${id}`).src = previewUrl;
+
+            // ── Render stats box ───────────────────────────────────────────
             document.getElementById(`proc-props-${id}`).innerHTML = `
                 <div class="fw-bold fs-5 ${isSuccess ? 'text-dark' : 'text-danger'}">${fSize} KB</div>
                 <div class="text-muted small">JPEG (Q: ${q})</div>
                 ${statusMessage}
             `;
-            
-            if (!isSuccess) {
-                document.getElementById(`dl-${id}`).classList.add('d-none');
+
+            // ── Toggle Download JPEG button ────────────────────────────────
+            const dlBtn = document.getElementById(`dl-${id}`);
+            if (isSuccess) {
+                dlBtn.classList.remove('d-none');     // make visible
+                dlBtn.removeAttribute('disabled');    // make clickable
             } else {
-                document.getElementById(`dl-${id}`).classList.remove('d-none');
+                dlBtn.classList.add('d-none');        // hide when invalid
+                dlBtn.setAttribute('disabled', true);
             }
-            // Removed unconditional removal of d-none to ensure button stays hidden when invalid
+
+            // ── Update download centre (after button state is settled) ─────
+            updateDownloadCenter();
 
         } catch (err) {
             console.error(err);
-            document.getElementById(`proc-props-${id}`).innerHTML = '<span class="text-danger">Failed</span>';
+            document.getElementById(`proc-props-${id}`).innerHTML = '<span class="text-danger">Processing failed – please try again.</span>';
+            if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
             delete processedBlobs[id];
+            document.getElementById(`dl-${id}`).classList.add('d-none');
             updateDownloadCenter();
         }
     }
@@ -792,11 +809,9 @@
         
         const bulkBtn = document.getElementById('btn-bulk-download');
         bulkBtn.disabled = (readyCount === 0 || !isNameValid);
-        
-        document.querySelectorAll('.btn-dl-indiv').forEach(btn => {
-            if(!isNameValid) btn.classList.add('disabled');
-            else btn.classList.remove('disabled');
-        });
+        // Note: individual Download JPEG buttons are controlled exclusively by
+        // the per-card isSuccess logic above, NOT by name validity here.
+        // Name validity is checked at click-time inside downloadIndividual().
         
         document.getElementById('zip-success').classList.add('d-none');
     }
