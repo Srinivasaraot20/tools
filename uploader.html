@@ -122,6 +122,8 @@
     .download-center { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; margin-top: 10px; margin-bottom: 40px; border: 1px solid #eee;}
     .status-ready { color: #2e7d32; font-weight: 600; }
     .status-waiting { color: #6c757d; }
+    /* Hide algorithm labels and selectors in the UI per user request */
+    [id^="summary-algo-"], select[id^="algo-"], label[for^="algo-"] { display: none !important; }
 </style>
 
 </head>
@@ -1779,7 +1781,7 @@
                 if (c.processed.sign) folder.file(getZipFilename(c.name, 'sign'), c.processed.sign);
                 if (c.processed.thumb) folder.file(getZipFilename(c.name, 'thumb'), c.processed.thumb);
                 if (c.processed.consent) folder.file(getZipFilename(c.name, 'consent'), c.processed.consent);
-             }
+            }
         });
         
         const content = await zip.generateAsync({ type: "blob" });
