@@ -34,6 +34,12 @@ const CONFIG = {
     },
     DOCUMENT: {
         MAX_SIZE_MB: 2,
-        MAX_SIZE_BYTES: 2 * 1024 * 1024
+        MAX_SIZE_BYTES: 2 * 1024 * 1024,
+        TARGET_KB: 47,
+        MIN_KB: 20,
+        MAX_KB: 50,
+        OUTPUT_FORMAT: 'PDF',
+        ACCEPT: '.jpg,.jpeg,.png,.pdf',
+        OUTPUT_NAME: 'document.pdf'
     }
 };

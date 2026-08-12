@@ -2,6 +2,14 @@
 
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+</script>
+<script src="/static/document-compressor.js"></script>
 <style>
     .upload-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; margin-bottom: 24px; transition: transform 0.2s; height: 100%; border: 1px solid #eee;}
     .upload-card:hover { transform: translateY(-2px); }
@@ -146,6 +154,8 @@
                         <button class="btn btn-danger btn-sm d-none" id="btn-cancel-batch" onclick="cancelBatchProcessing()">🛑 Cancel</button>
                         <button class="btn btn-primary btn-sm d-none" id="btn-dl-batch-zip" onclick="downloadBatchZip()">📦 Download Processed_Candidates.zip</button>
                     </div>
+                    <div class="alert alert-warning d-none" id="batch-validation-alert"></div>
+                    <div class="alert alert-secondary d-none" id="batch-error-detail-panel"></div>
 
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                         <table class="table table-sm table-bordered table-hover align-middle small bg-white">
@@ -190,6 +200,7 @@
                         <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">Photo.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">Sign.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">Thumb.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Document:</strong> <span id="prev-document">Document.pdf</span></div>
                         <div class="col-md-6 mb-1"><strong>ZIP:</strong> <span id="prev-zip">.zip</span></div>
                     </div>
                 </div>
@@ -212,7 +223,7 @@
                         <ul class="list-group list-group-flush mb-4" id="dc-status-list">
                             <!-- Status list -->
                         </ul>
-                        <div class="fw-bold text-primary mb-3" id="dc-count-summary">0 of 3 Files Ready</div>
+                        <div class="fw-bold text-primary mb-3" id="dc-count-summary">0 of 4 Files Ready</div>
                     </div>
                     <div class="col-md-6 d-flex flex-column justify-content-center align-items-center bg-light rounded-3 p-4 border">
                         <button id="btn-bulk-download" class="btn btn-primary btn-lg rounded-pill px-4 shadow-sm w-100 mb-2" disabled onclick="downloadAllZip()">
@@ -235,9 +246,10 @@
     const API_URL = '/api/process-image/';
 
         const configs = [
-        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
+        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: ' Photo.jpg', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: ' Sign.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', suffix: ' Thumb.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'document', title: '4. Upload Document', shortName: 'Document', kind: 'document', suffix: ' Document.pdf', defaults: { maxInputMb: 2, targetKb: 45, minKb: 20, maxKb: 50, format: 'PDF' } }
     ];
 
     const state = {};
@@ -271,6 +283,7 @@
         document.getElementById('prev-photo').innerText = generateGovernmentFilename(sanitizedCandidateName, 'photo');
         document.getElementById('prev-sig').innerText = generateGovernmentFilename(sanitizedCandidateName, 'signature');
         document.getElementById('prev-thumb').innerText = generateGovernmentFilename(sanitizedCandidateName, 'thumb');
+        document.getElementById('prev-document').innerText = generateGovernmentFilename(sanitizedCandidateName, 'document');
         document.getElementById('prev-zip').innerText = sanitizedCandidateName ? `${sanitizedCandidateName}.zip` : '.zip';
         
         document.getElementById('preview-section').style.opacity = isValid ? '1' : '0.5';
@@ -290,6 +303,51 @@
     }
 
     function createCard(c) {
+        if (c.kind === 'document') {
+            return `
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="upload-card" id="card-${c.id}">
+                <h5 class="fw-bold mb-3">${c.title}</h5>
+
+                <div class="drop-zone" id="drop-${c.id}">
+                    <span class="material-icons-round text-primary fs-1 mb-2">description</span>
+                    <p class="mb-1 fw-medium">Drag & Drop Document Here</p>
+                    <p class="text-muted small mb-3">or</p>
+                    <button class="btn btn-primary btn-sm rounded-pill px-4" onclick="document.getElementById('input-${c.id}').click()">Browse Files</button>
+                    <input type="file" id="input-${c.id}" class="d-none" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
+                    <p class="text-muted small mt-3 mb-0">JPG, JPEG, PNG, PDF<br>Maximum input size: <strong>2 MB</strong></p>
+                </div>
+
+                <div class="preview-container mt-3" id="preview-cont-${c.id}">
+                    <div class="alert alert-success py-2 mb-3">
+                        <div class="fw-bold mb-1">Compression Complete</div>
+                        <div class="small" id="doc-stats-${c.id}"></div>
+                    </div>
+                    <div class="mb-2">
+                        <iframe id="doc-preview-${c.id}" class="w-100 border rounded" style="height:220px;background:#f8f9fa;" title="PDF Preview"></iframe>
+                    </div>
+                    <div class="d-flex gap-2 mt-3 flex-wrap">
+                        <button class="btn btn-outline-primary btn-sm flex-fill" onclick="previewDocument('${c.id}')">Preview</button>
+                        <button class="btn btn-success btn-sm flex-fill btn-dl-indiv" id="dl-${c.id}" onclick="downloadIndividual('${c.id}')">Download PDF</button>
+                        <button class="btn btn-outline-danger btn-sm flex-fill" onclick="resetCard('${c.id}')">Remove / Replace</button>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div class="active-settings" id="active-summary-${c.id}">
+                    <div class="fw-bold mb-1"><span class="material-icons-round fs-6 align-text-bottom">check_circle</span> Active Settings</div>
+                    Input: JPG, JPEG, PNG, PDF<br>
+                    Maximum Input: 2 MB<br>
+                    Target Size: <strong>45 KB</strong><br>
+                    Allowed Size: 20–50 KB<br>
+                    Output: <strong>PDF</strong><br>
+                    Compression: Automatic
+                </div>
+            </div>
+        </div>`;
+        }
+
         return `
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="upload-card" id="card-${c.id}">
@@ -336,7 +394,7 @@
                 <div class="active-settings" id="active-summary-${c.id}">
                     <div class="fw-bold mb-1"><span class="material-icons-round fs-6 align-text-bottom">check_circle</span> Active Settings</div>
                     <span id="summary-w-${c.id}">${c.defaults.width}</span> × <span id="summary-h-${c.id}">${c.defaults.height}</span> px<br>
-                    <span id="summary-s-${c.id}">${c.defaults.targetSize}</span> KB | <span id="summary-dpi-${c.id}">${c.defaults.dpi}</span> DPI<br>
+                    <span id="summary-s-${c.id}">${c.defaults.minSize}–${c.defaults.maxSize}</span> KB | <span id="summary-dpi-${c.id}">${c.defaults.dpi}</span> DPI<br>
                     Algorithm: <span id="summary-algo-${c.id}">${c.defaults.algo}</span><br>
                     Output: JPEG
                 </div>
@@ -353,8 +411,12 @@
                             <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="h-${c.id}" value="${c.defaults.height}">
                         </div>
                         <div class="col-6">
-                            <label class="form-label mb-0">Target (KB)</label>
-                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="s-${c.id}" value="${c.defaults.targetSize}">
+                            <label class="form-label mb-0">Min Size (KB)</label>
+                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="min-s-${c.id}" value="${c.defaults.minSize}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label mb-0">Max Size (KB)</label>
+                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="max-s-${c.id}" value="${c.defaults.maxSize}">
                         </div>
                         <div class="col-6">
                             <label class="form-label mb-0">DPI</label>
@@ -399,17 +461,19 @@
             e.preventDefault();
             drop.classList.remove('dragover');
             if(!drop.classList.contains('disabled') && e.dataTransfer.files.length) {
-                processImage(c.id, e.dataTransfer.files[0]);
+                handleUpload(c.id, e.dataTransfer.files[0]);
             }
         });
 
         input.addEventListener('change', e => {
-            if(e.target.files.length) processImage(c.id, e.target.files[0]);
+            if(e.target.files.length) handleUpload(c.id, e.target.files[0]);
         });
 
-        document.querySelectorAll(`.spec-input-${c.id}`).forEach(el => {
-            el.addEventListener('input', () => checkUnsavedChanges(c.id));
-        });
+        if (c.kind !== 'document') {
+            document.querySelectorAll(`.spec-input-${c.id}`).forEach(el => {
+                el.addEventListener('input', () => checkUnsavedChanges(c.id));
+            });
+        }
     });
 
     function toggleSettings(id) {
@@ -460,19 +524,19 @@
             return;
         }
 
-        state[id] = { 
-            width: w, 
-            height: h, 
-            targetSize: s, 
-            dpi: dpi, 
+        state[id] = {
+            width: w,
+            height: h,
+            minSize: parseInt(min_s, 10),
+            maxSize: parseInt(max_s, 10),
+            dpi: dpi,
             algo: algo,
-            threshold: parseInt(s) >= 40 ? parseInt(s) + 5 : parseInt(s) + 2,
-            ideal: parseInt(s) - 1
+            format: 'JPEG'
         };
-        
+
         document.getElementById(`summary-w-${id}`).innerText = w;
         document.getElementById(`summary-h-${id}`).innerText = h;
-        document.getElementById(`summary-s-${id}`).innerText = s;
+        document.getElementById(`summary-s-${id}`).innerText = `${min_s}–${max_s}`;
         document.getElementById(`summary-dpi-${id}`).innerText = dpi;
         document.getElementById(`summary-algo-${id}`).innerText = algo;
 
@@ -484,7 +548,8 @@
         const current = state[id];
         document.getElementById(`w-${id}`).value = current.width;
         document.getElementById(`h-${id}`).value = current.height;
-        document.getElementById(`s-${id}`).value = current.targetSize;
+        document.getElementById(`min-s-${id}`).value = current.minSize;
+        document.getElementById(`max-s-${id}`).value = current.maxSize;
         document.getElementById(`dpi-${id}`).value = current.dpi;
         document.getElementById(`algo-${id}`).value = current.algo;
         checkUnsavedChanges(id);
@@ -494,7 +559,8 @@
         const def = configs.find(x => x.id === id).defaults;
         document.getElementById(`w-${id}`).value = def.width;
         document.getElementById(`h-${id}`).value = def.height;
-        document.getElementById(`s-${id}`).value = def.targetSize;
+        document.getElementById(`min-s-${id}`).value = def.minSize;
+        document.getElementById(`max-s-${id}`).value = def.maxSize;
         document.getElementById(`dpi-${id}`).value = def.dpi;
         document.getElementById(`algo-${id}`).value = def.algo;
         checkUnsavedChanges(id);
@@ -504,9 +570,64 @@
         document.getElementById(`input-${id}`).value = '';
         document.getElementById(`drop-${id}`).style.display = 'block';
         document.getElementById(`preview-cont-${id}`).style.display = 'none';
-        
+        const frame = document.getElementById(`doc-preview-${id}`);
+        if (frame) frame.removeAttribute('src');
+        if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
         delete processedBlobs[id];
         updateDownloadCenter();
+    }
+
+    function handleUpload(id, file) {
+        const cfg = configs.find(x => x.id === id);
+        if (cfg && cfg.kind === 'document') return processDocument(id, file);
+        return processImage(id, file);
+    }
+
+    function previewDocument(id) {
+        if (!processedBlobs[id] || !processedBlobs[id].url) return;
+        window.open(processedBlobs[id].url, '_blank');
+    }
+
+    async function processDocument(id, file) {
+        const drop = document.getElementById(`drop-${id}`);
+        const preview = document.getElementById(`preview-cont-${id}`);
+        const statsEl = document.getElementById(`doc-stats-${id}`);
+        const frame = document.getElementById(`doc-preview-${id}`);
+
+        try {
+            DocumentCompressor.validateFile(file);
+        } catch (err) {
+            alert(err.message);
+            return;
+        }
+
+        drop.style.display = 'none';
+        preview.style.display = 'block';
+        statsEl.innerHTML = '<span class="text-muted">Compressing toward 45 KB…</span>';
+        frame.removeAttribute('src');
+
+        try {
+            const { file: outFile, stats } = await DocumentCompressor.compress(file);
+            if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
+            const url = URL.createObjectURL(outFile);
+            processedBlobs[id] = { blob: outFile, url, valid: true, isPdf: true, stats };
+
+            statsEl.innerHTML = `
+                <div><strong>Original File:</strong> ${stats.originalName}</div>
+                <div><strong>Original Size:</strong> ${stats.originalSizeLabel}</div>
+                <div><strong>Output Format:</strong> PDF</div>
+                <div><strong>Final Size:</strong> ${stats.finalSizeLabel}</div>
+                <div><strong>Compression:</strong> ${stats.compressionPercent}%</div>
+            `;
+            frame.src = url;
+            updateDownloadCenter();
+        } catch (err) {
+            console.error(err);
+            statsEl.innerHTML = `<span class="text-danger">${err.message || 'Unable to convert this file to PDF.'}</span>`;
+            if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
+            delete processedBlobs[id];
+            updateDownloadCenter();
+        }
     }
 
     async function processImage(id, file) {
@@ -613,14 +734,27 @@
     }
     
     function downloadIndividual(id) {
-        if(sanitizedCandidateName.length < 3) {
+        if (!processedBlobs[id] || !processedBlobs[id].url) return;
+        const cfg = configs.find(x => x.id === id);
+        const isDoc = cfg && cfg.kind === 'document';
+
+        if (!isDoc && sanitizedCandidateName.length < 3) {
             alert("Please enter a valid candidate name (min 3 chars) first.");
             document.getElementById('candidate-name').focus();
             return;
         }
-        
-        const filename = generateGovernmentFilename(sanitizedCandidateName, id);
-        
+
+        let filename;
+        if (isDoc) {
+            filename = sanitizedCandidateName.length >= 3
+                ? generateGovernmentFilename(sanitizedCandidateName, id)
+                : (processedBlobs[id].stats && processedBlobs[id].stats.originalName
+                    ? processedBlobs[id].stats.originalName.replace(/\.[^.]+$/, '') + '.pdf'
+                    : 'document.pdf');
+        } else {
+            filename = generateGovernmentFilename(sanitizedCandidateName, id);
+        }
+
         const a = document.createElement('a');
         a.href = processedBlobs[id].url;
         a.download = filename;
@@ -646,7 +780,7 @@
             </li>`;
         }).join('');
 
-        document.getElementById('dc-count-summary').innerText = `${readyCount} of 3 Files Ready`;
+        document.getElementById('dc-count-summary').innerText = `${readyCount} of ${configs.length} Files Ready`;
         
         const bulkBtn = document.getElementById('btn-bulk-download');
         bulkBtn.disabled = (readyCount === 0 || !isNameValid);
@@ -749,6 +883,10 @@
         if (type === 'photo' || type === 'person-photo') suffix = " Photo";
         if (type === 'signature') suffix = " Sign";
         if (type === 'thumb' || type === 'thumb-impression') suffix = " Thumb";
+        if (type === 'document') {
+            if (!shortName) return 'Document.pdf';
+            return shortName + ' Document.pdf';
+        }
         if (!shortName) return suffix.trim() + '.jpg';
         return shortName + suffix + '.jpg';
     }
@@ -1049,26 +1187,32 @@
         const cands = Object.values(batchCandidates);
         
         cands.forEach(c => {
-            const hasPhoto = !!c.files.photo;
-            const hasSign = !!c.files.sign;
-            const hasThumb = !!c.files.thumb;
+            // Pre-check: show availability of original files. After processing,
+            // show whether outputs were generated.
+            const inProcessingState = Object.keys(c.processed || {}).length > 0;
+            const hasPhoto = inProcessingState ? ((c.processed && c.processed.photo) ? '✅' : '❌') : ((c.files && c.files.photo) ? '✅' : '❌');
+            const hasSign = inProcessingState ? ((c.processed && c.processed.sign) ? '✅' : '❌') : ((c.files && c.files.sign) ? '✅' : '❌');
+            const hasThumb = inProcessingState ? ((c.processed && c.processed.thumb) ? '✅' : '❌') : ((c.files && c.files.thumb) ? '✅' : '❌');
             
             let statusClass = "text-muted";
-            if (c.status.includes('Completed')) statusClass = "text-success fw-bold";
+            if (c.status.includes('Completed') || (c.status && c.status.startsWith('Processed'))) statusClass = "text-success fw-bold";
             if (c.status === 'Failed') statusClass = "text-danger fw-bold";
             if (c.status === 'Processing...') statusClass = "text-primary fw-bold";
-            if (c.status.includes('Missing')) statusClass = "text-warning fw-bold";
+            if (c.status.includes('Missing') && !(c.status && c.status.startsWith('Processed'))) statusClass = "text-warning fw-bold";
             
             html += `<tr>
                 <td class="fw-medium">${c.name}</td>
-                <td class="text-center">${hasPhoto ? '✅' : '❌'}</td>
-                <td class="text-center">${hasSign ? '✅' : '❌'}</td>
-                <td class="text-center">${hasThumb ? '✅' : '❌'}</td>
+                <td class="text-center">${hasPhoto}</td>
+                <td class="text-center">${hasSign}</td>
+                <td class="text-center">${hasThumb}</td>
                 <td class="${statusClass}">${c.status}</td>
             </tr>`;
         });
         tbody.innerHTML = html;
-        document.getElementById('batch-progress-text').innerText = `0 of ${cands.length} candidates processed`;
+        const processedCount = cands.filter(c => Object.keys(c.processed || {}).length > 0).length;
+        const pct = cands.length ? Math.round((processedCount / cands.length) * 100) : 0;
+        document.getElementById('batch-progress-text').innerText = `${processedCount} of ${cands.length} candidates processed`;
+        document.getElementById('batch-progress-bar').style.width = `${pct}%`;
     }
     
     async function processBatchImage(file, configId) {
@@ -1115,18 +1259,49 @@
             c.status = 'Processing...';
             renderBatchTable();
             
-            try {
-                if (c.files.photo && !c.processed.photo) c.processed.photo = await processBatchImage(c.files.photo, 'person-photo');
-                if (c.files.sign && !c.processed.sign) c.processed.sign = await processBatchImage(c.files.sign, 'signature');
-                if (c.files.thumb && !c.processed.thumb) c.processed.thumb = await processBatchImage(c.files.thumb, 'thumb-impression');
-                
-                if (!c.files.photo || !c.files.sign || !c.files.thumb) {
-                    c.status = 'Completed (Missing Files)';
+            // Process each candidate file independently
+            const fileMap = [
+                { key: 'photo', cfg: 'person-photo' },
+                { key: 'sign', cfg: 'signature' },
+                { key: 'thumb', cfg: 'thumb-impression' },
+                { key: 'consent', cfg: 'document' }
+            ];
+            const fileErrors = [];
+            let processedCount = 0;
+
+            for (const f of fileMap) {
+                try {
+                    if (c.files[f.key] && !(c.processed && c.processed[f.key])) {
+                        const out = await processBatchImage(c.files[f.key], f.cfg);
+                        c.processed = c.processed || {};
+                        c.processed[f.key] = out;
+                        processedCount++;
+                    }
+                } catch (err) {
+                    const msg = (err && err.message) ? err.message : String(err);
+                    c.failedFiles = c.failedFiles || {};
+                    c.failedFiles[f.key] = msg;
+                    fileErrors.push(`${f.key}: ${msg}`);
+                }
+            }
+
+            const originalMissing = [];
+            ['photo','sign','thumb','consent'].forEach(k => { if (!c.files[k]) originalMissing.push(k); });
+
+            if (processedCount > 0) {
+                if (fileErrors.length > 0 || originalMissing.length > 0) {
+                    c.status = 'Completed with Warnings';
+                    const parts = [];
+                    if (originalMissing.length) parts.push('Missing: ' + originalMissing.join(', '));
+                    if (fileErrors.length) parts.push('Failed: ' + fileErrors.join('; '));
+                    c.errorDetails = parts.join(' ; ');
                 } else {
                     c.status = 'Completed';
+                    c.errorDetails = '';
                 }
-            } catch (err) {
+            } else {
                 c.status = 'Failed';
+                c.errorDetails = fileErrors.length ? fileErrors.join('; ') : (originalMissing.length ? 'No files processed' : 'Processing failed');
             }
             
             completed++;
@@ -1139,6 +1314,34 @@
         document.getElementById('btn-cancel-batch').classList.add('d-none');
         document.getElementById('btn-dl-batch-zip').classList.remove('d-none');
         document.getElementById('batch-progress-bar').classList.add('bg-success');
+        // Show summary alert and per-candidate details
+        const alert = document.getElementById('batch-validation-alert');
+        alert.classList.remove('alert-warning');
+        alert.classList.add('alert-success');
+        alert.classList.remove('d-none');
+        const total = cands.length;
+        const processedCandidates = cands.filter(c => Object.keys(c.processed || {}).length > 0).length;
+        const failedCandidates = cands.filter(c => (c.status && c.status.startsWith('Failed')) && Object.keys(c.processed || {}).length === 0).length;
+        const skippedCandidates = total - processedCandidates - failedCandidates;
+        alert.innerHTML = `<strong>Batch Processing Completed</strong><br>Result:<br>Total Candidates: ${total}<br>Successfully Processed: ${processedCandidates}<br>Skipped / Incomplete: ${skippedCandidates}<br>Failed During Processing: ${failedCandidates}`;
+
+        const errorPanel = document.getElementById('batch-error-detail-panel');
+        if (errorPanel) {
+            const items = cands.map(c => {
+                const notes = [];
+                if (c.precheckNotes) notes.push(c.precheckNotes);
+                if (c.errorDetails) notes.push(c.errorDetails);
+                if (notes.length === 0) return null;
+                return `<div class="mb-2"><strong>${c.name}</strong><br>${notes.join(' ; ')}</div>`;
+            }).filter(Boolean);
+            if (items.length) {
+                errorPanel.classList.remove('d-none');
+                errorPanel.innerHTML = items.join('\n');
+            } else {
+                errorPanel.classList.add('d-none');
+                errorPanel.innerHTML = '';
+            }
+        }
     }
     
     function cancelBatchProcessing() {
@@ -1152,13 +1355,41 @@
         btn.innerText = "Creating Master ZIP...";
         
         const zip = new JSZip();
-        
+
+        function getZipFilename(candidateName, docKey, blob) {
+            const base = (candidateName || '').substring(0, 8);
+            let suffix = '';
+            if (docKey === 'photo') suffix = ' Photo';
+            else if (docKey === 'sign') suffix = ' Sign';
+            else if (docKey === 'thumb') suffix = ' Thumb';
+            else if (docKey === 'consent') suffix = ' Form';
+            else suffix = ' ' + docKey;
+
+            let ext = '';
+            try {
+                const t = (blob && blob.type) ? blob.type.toLowerCase() : '';
+                if (t.includes('pdf')) ext = '.pdf';
+                else if (t.includes('jpeg') || t.includes('jpg')) ext = '.jpg';
+                else if (t.includes('png')) ext = '.png';
+            } catch (e) {
+                ext = '';
+            }
+
+            if (!ext) {
+                if (docKey === 'photo' || docKey === 'sign' || docKey === 'thumb') ext = '.jpg';
+                if (docKey === 'consent') ext = '.pdf';
+            }
+
+            return `${base}${suffix}${ext}`;
+        }
+
         Object.values(batchCandidates).forEach(c => {
             if(Object.keys(c.processed).length > 0) {
                 const folder = zip.folder(c.name);
-                if(c.processed.photo) folder.file(`${c.name}_Photo.jpg`, c.processed.photo);
-                if(c.processed.sign) folder.file(`${c.name}_Signature.jpg`, c.processed.sign);
-                if(c.processed.thumb) folder.file(`${c.name}_Thumb.jpg`, c.processed.thumb);
+                if(c.processed.photo) folder.file(getZipFilename(c.name, 'photo', c.processed.photo), c.processed.photo);
+                if(c.processed.sign) folder.file(getZipFilename(c.name, 'sign', c.processed.sign), c.processed.sign);
+                if(c.processed.thumb) folder.file(getZipFilename(c.name, 'thumb', c.processed.thumb), c.processed.thumb);
+                if(c.processed.consent) folder.file(getZipFilename(c.name, 'consent', c.processed.consent), c.processed.consent);
             }
         });
         

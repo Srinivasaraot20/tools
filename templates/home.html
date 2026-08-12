@@ -2,6 +2,14 @@
 
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+    if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+</script>
+<script src="/static/document-compressor.js"></script>
 <style>
     .upload-card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 24px; margin-bottom: 24px; transition: transform 0.2s; height: 100%; border: 1px solid #eee;}
     .upload-card:hover { transform: translateY(-2px); }
@@ -32,13 +40,13 @@
                 
                 <div class="row mb-4">
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Upload Type <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">Image Type <span class="text-danger">*</span></label>
                         <select class="form-select form-select-lg border-2 shadow-sm" id="gov-upload-type">
-                            <option value="photo" selected>Upload Photo</option>
-                            <option value="signature">Upload Signature</option>
-                            <option value="thumb">Upload Thumb</option>
+                            <option value="photo" selected>Photo</option>
+                            <option value="signature">Signature</option>
+                            <option value="thumb">Thumb Impression</option>
                         </select>
-                        <div class="form-text">All valid images in the folder will be processed as this type.</div>
+                        <div class="form-text" id="gov-upload-type-help">Photo: All images in the selected folder will be processed according to the configured Photo requirements.</div>
                     </div>
                     <div class="col-md-8">
                         <label class="form-label fw-bold">Selected Folder <span class="text-danger">*</span></label>
@@ -190,6 +198,7 @@
                         <div class="col-md-6 mb-1"><strong>Photo:</strong> <span id="prev-photo">Photo.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>Signature:</strong> <span id="prev-sig">Sign.jpg</span></div>
                         <div class="col-md-6 mb-1"><strong>Thumb:</strong> <span id="prev-thumb">Thumb.jpg</span></div>
+                        <div class="col-md-6 mb-1"><strong>Document:</strong> <span id="prev-document">Document.pdf</span></div>
                         <div class="col-md-6 mb-1"><strong>ZIP:</strong> <span id="prev-zip">.zip</span></div>
                     </div>
                 </div>
@@ -212,7 +221,7 @@
                         <ul class="list-group list-group-flush mb-4" id="dc-status-list">
                             <!-- Status list -->
                         </ul>
-                        <div class="fw-bold text-primary mb-3" id="dc-count-summary">0 of 3 Files Ready</div>
+                        <div class="fw-bold text-primary mb-3" id="dc-count-summary">0 of 4 Files Ready</div>
                     </div>
                     <div class="col-md-6 d-flex flex-column justify-content-center align-items-center bg-light rounded-3 p-4 border">
                         <button id="btn-bulk-download" class="btn btn-primary btn-lg rounded-pill px-4 shadow-sm w-100 mb-2" disabled onclick="downloadAllZip()">
@@ -235,9 +244,10 @@
     const API_URL = '/api/process-image/';
 
         const configs = [
-        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } }
+        { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: ' Photo.jpg', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: ' Sign.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', suffix: ' Thumb.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
+        { id: 'document', title: '4. Upload Consent Form', shortName: 'Consent Form', kind: 'document', suffix: ' Document.pdf', defaults: { maxInputMb: 2, targetKb: 45, minKb: 20, maxKb: 50, format: 'PDF' } }
     ];
 
     const state = {};
@@ -271,6 +281,7 @@
         document.getElementById('prev-photo').innerText = generateGovernmentFilename(sanitizedCandidateName, 'photo');
         document.getElementById('prev-sig').innerText = generateGovernmentFilename(sanitizedCandidateName, 'signature');
         document.getElementById('prev-thumb').innerText = generateGovernmentFilename(sanitizedCandidateName, 'thumb');
+        document.getElementById('prev-document').innerText = generateGovernmentFilename(sanitizedCandidateName, 'document');
         document.getElementById('prev-zip').innerText = sanitizedCandidateName ? `${sanitizedCandidateName}.zip` : '.zip';
         
         document.getElementById('preview-section').style.opacity = isValid ? '1' : '0.5';
@@ -290,6 +301,51 @@
     }
 
     function createCard(c) {
+        if (c.kind === 'document') {
+            return `
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="upload-card" id="card-${c.id}">
+                <h5 class="fw-bold mb-3">${c.title}</h5>
+
+                <div class="drop-zone" id="drop-${c.id}">
+                    <span class="material-icons-round text-primary fs-1 mb-2">description</span>
+                    <p class="mb-1 fw-medium">Drag & Drop Consent Form Here</p>
+                    <p class="text-muted small mb-3">or</p>
+                    <button class="btn btn-primary btn-sm rounded-pill px-4" onclick="document.getElementById('input-${c.id}').click()">Browse Files</button>
+                    <input type="file" id="input-${c.id}" class="d-none" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
+                    <p class="text-muted small mt-3 mb-0">JPG, JPEG, PNG, PDF<br>Maximum input size: <strong>2 MB</strong></p>
+                </div>
+
+                <div class="preview-container mt-3" id="preview-cont-${c.id}">
+                    <div class="alert alert-success py-2 mb-3">
+                        <div class="fw-bold mb-1">Compression Complete</div>
+                        <div class="small" id="doc-stats-${c.id}"></div>
+                    </div>
+                    <div class="mb-2">
+                        <iframe id="doc-preview-${c.id}" class="w-100 border rounded" style="height:220px;background:#f8f9fa;" title="PDF Preview"></iframe>
+                    </div>
+                    <div class="d-flex gap-2 mt-3 flex-wrap">
+                        <button class="btn btn-outline-primary btn-sm flex-fill" onclick="previewDocument('${c.id}')">Preview</button>
+                        <button class="btn btn-success btn-sm flex-fill btn-dl-indiv" id="dl-${c.id}" onclick="downloadIndividual('${c.id}')">Download PDF</button>
+                        <button class="btn btn-outline-danger btn-sm flex-fill" onclick="resetCard('${c.id}')">Remove / Replace</button>
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                <div class="active-settings" id="active-summary-${c.id}">
+                    <div class="fw-bold mb-1"><span class="material-icons-round fs-6 align-text-bottom">check_circle</span> Active Settings</div>
+                    Input: JPG, JPEG, PNG, PDF<br>
+                    Maximum Input: 2 MB<br>
+                    Target Size: <strong>45 KB</strong><br>
+                    Allowed Size: 20–50 KB<br>
+                    Output: <strong>PDF</strong><br>
+                    Compression: Automatic
+                </div>
+            </div>
+        </div>`;
+        }
+
         return `
         <div class="col-lg-4 col-md-6 mb-4">
             <div class="upload-card" id="card-${c.id}">
@@ -336,7 +392,7 @@
                 <div class="active-settings" id="active-summary-${c.id}">
                     <div class="fw-bold mb-1"><span class="material-icons-round fs-6 align-text-bottom">check_circle</span> Active Settings</div>
                     <span id="summary-w-${c.id}">${c.defaults.width}</span> × <span id="summary-h-${c.id}">${c.defaults.height}</span> px<br>
-                    <span id="summary-s-${c.id}">${c.defaults.targetSize}</span> KB | <span id="summary-dpi-${c.id}">${c.defaults.dpi}</span> DPI<br>
+                    <span id="summary-s-${c.id}">${c.defaults.minSize}–${c.defaults.maxSize}</span> KB | <span id="summary-dpi-${c.id}">${c.defaults.dpi}</span> DPI<br>
                     Algorithm: <span id="summary-algo-${c.id}">${c.defaults.algo}</span><br>
                     Output: JPEG
                 </div>
@@ -353,8 +409,12 @@
                             <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="h-${c.id}" value="${c.defaults.height}">
                         </div>
                         <div class="col-6">
-                            <label class="form-label mb-0">Target (KB)</label>
-                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="s-${c.id}" value="${c.defaults.targetSize}">
+                            <label class="form-label mb-0">Min Size (KB)</label>
+                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="min-s-${c.id}" value="${c.defaults.minSize}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label mb-0">Max Size (KB)</label>
+                            <input type="number" class="form-control form-control-sm spec-input-${c.id}" id="max-s-${c.id}" value="${c.defaults.maxSize}">
                         </div>
                         <div class="col-6">
                             <label class="form-label mb-0">DPI</label>
@@ -399,17 +459,19 @@
             e.preventDefault();
             drop.classList.remove('dragover');
             if(!drop.classList.contains('disabled') && e.dataTransfer.files.length) {
-                processImage(c.id, e.dataTransfer.files[0]);
+                handleUpload(c.id, e.dataTransfer.files[0]);
             }
         });
 
         input.addEventListener('change', e => {
-            if(e.target.files.length) processImage(c.id, e.target.files[0]);
+            if(e.target.files.length) handleUpload(c.id, e.target.files[0]);
         });
 
-        document.querySelectorAll(`.spec-input-${c.id}`).forEach(el => {
-            el.addEventListener('input', () => checkUnsavedChanges(c.id));
-        });
+        if (c.kind !== 'document') {
+            document.querySelectorAll(`.spec-input-${c.id}`).forEach(el => {
+                el.addEventListener('input', () => checkUnsavedChanges(c.id));
+            });
+        }
     });
 
     function toggleSettings(id) {
@@ -460,19 +522,19 @@
             return;
         }
 
-        state[id] = { 
-            width: w, 
-            height: h, 
-            targetSize: s, 
-            dpi: dpi, 
+        state[id] = {
+            width: w,
+            height: h,
+            minSize: parseInt(min_s, 10),
+            maxSize: parseInt(max_s, 10),
+            dpi: dpi,
             algo: algo,
-            threshold: parseInt(s) >= 40 ? parseInt(s) + 5 : parseInt(s) + 2,
-            ideal: parseInt(s) - 1
+            format: 'JPEG'
         };
-        
+
         document.getElementById(`summary-w-${id}`).innerText = w;
         document.getElementById(`summary-h-${id}`).innerText = h;
-        document.getElementById(`summary-s-${id}`).innerText = s;
+        document.getElementById(`summary-s-${id}`).innerText = `${min_s}–${max_s}`;
         document.getElementById(`summary-dpi-${id}`).innerText = dpi;
         document.getElementById(`summary-algo-${id}`).innerText = algo;
 
@@ -484,7 +546,8 @@
         const current = state[id];
         document.getElementById(`w-${id}`).value = current.width;
         document.getElementById(`h-${id}`).value = current.height;
-        document.getElementById(`s-${id}`).value = current.targetSize;
+        document.getElementById(`min-s-${id}`).value = current.minSize;
+        document.getElementById(`max-s-${id}`).value = current.maxSize;
         document.getElementById(`dpi-${id}`).value = current.dpi;
         document.getElementById(`algo-${id}`).value = current.algo;
         checkUnsavedChanges(id);
@@ -494,7 +557,8 @@
         const def = configs.find(x => x.id === id).defaults;
         document.getElementById(`w-${id}`).value = def.width;
         document.getElementById(`h-${id}`).value = def.height;
-        document.getElementById(`s-${id}`).value = def.targetSize;
+        document.getElementById(`min-s-${id}`).value = def.minSize;
+        document.getElementById(`max-s-${id}`).value = def.maxSize;
         document.getElementById(`dpi-${id}`).value = def.dpi;
         document.getElementById(`algo-${id}`).value = def.algo;
         checkUnsavedChanges(id);
@@ -504,9 +568,64 @@
         document.getElementById(`input-${id}`).value = '';
         document.getElementById(`drop-${id}`).style.display = 'block';
         document.getElementById(`preview-cont-${id}`).style.display = 'none';
-        
+        const frame = document.getElementById(`doc-preview-${id}`);
+        if (frame) frame.removeAttribute('src');
+        if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
         delete processedBlobs[id];
         updateDownloadCenter();
+    }
+
+    function handleUpload(id, file) {
+        const cfg = configs.find(x => x.id === id);
+        if (cfg && cfg.kind === 'document') return processDocument(id, file);
+        return processImage(id, file);
+    }
+
+    function previewDocument(id) {
+        if (!processedBlobs[id] || !processedBlobs[id].url) return;
+        window.open(processedBlobs[id].url, '_blank');
+    }
+
+    async function processDocument(id, file) {
+        const drop = document.getElementById(`drop-${id}`);
+        const preview = document.getElementById(`preview-cont-${id}`);
+        const statsEl = document.getElementById(`doc-stats-${id}`);
+        const frame = document.getElementById(`doc-preview-${id}`);
+
+        try {
+            DocumentCompressor.validateFile(file);
+        } catch (err) {
+            alert(err.message);
+            return;
+        }
+
+        drop.style.display = 'none';
+        preview.style.display = 'block';
+        statsEl.innerHTML = '<span class="text-muted">Compressing toward 45 KB…</span>';
+        frame.removeAttribute('src');
+
+        try {
+            const { file: outFile, stats } = await DocumentCompressor.compress(file);
+            if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
+            const url = URL.createObjectURL(outFile);
+            processedBlobs[id] = { blob: outFile, url, valid: true, isPdf: true, stats };
+
+            statsEl.innerHTML = `
+                <div><strong>Original File:</strong> ${stats.originalName}</div>
+                <div><strong>Original Size:</strong> ${stats.originalSizeLabel}</div>
+                <div><strong>Output Format:</strong> PDF</div>
+                <div><strong>Final Size:</strong> ${stats.finalSizeLabel}</div>
+                <div><strong>Compression:</strong> ${stats.compressionPercent}%</div>
+            `;
+            frame.src = url;
+            updateDownloadCenter();
+        } catch (err) {
+            console.error(err);
+            statsEl.innerHTML = `<span class="text-danger">${err.message || 'Unable to convert this file to PDF.'}</span>`;
+            if (processedBlobs[id] && processedBlobs[id].url) URL.revokeObjectURL(processedBlobs[id].url);
+            delete processedBlobs[id];
+            updateDownloadCenter();
+        }
     }
 
     async function processImage(id, file) {
@@ -613,14 +732,27 @@
     }
     
     function downloadIndividual(id) {
-        if(sanitizedCandidateName.length < 3) {
+        if (!processedBlobs[id] || !processedBlobs[id].url) return;
+        const cfg = configs.find(x => x.id === id);
+        const isDoc = cfg && cfg.kind === 'document';
+
+        if (!isDoc && sanitizedCandidateName.length < 3) {
             alert("Please enter a valid candidate name (min 3 chars) first.");
             document.getElementById('candidate-name').focus();
             return;
         }
-        
-        const filename = generateGovernmentFilename(sanitizedCandidateName, id);
-        
+
+        let filename;
+        if (isDoc) {
+            filename = sanitizedCandidateName.length >= 3
+                ? generateGovernmentFilename(sanitizedCandidateName, id)
+                : (processedBlobs[id].stats && processedBlobs[id].stats.originalName
+                    ? processedBlobs[id].stats.originalName.replace(/\.[^.]+$/, '') + '.pdf'
+                    : 'document.pdf');
+        } else {
+            filename = generateGovernmentFilename(sanitizedCandidateName, id);
+        }
+
         const a = document.createElement('a');
         a.href = processedBlobs[id].url;
         a.download = filename;
@@ -646,7 +778,7 @@
             </li>`;
         }).join('');
 
-        document.getElementById('dc-count-summary').innerText = `${readyCount} of 3 Files Ready`;
+        document.getElementById('dc-count-summary').innerText = `${readyCount} of ${configs.length} Files Ready`;
         
         const bulkBtn = document.getElementById('btn-bulk-download');
         bulkBtn.disabled = (readyCount === 0 || !isNameValid);
@@ -723,11 +855,31 @@
         });
     }
     
+    const govUploadType = document.getElementById('gov-upload-type');
+    const govUploadTypeHelp = document.getElementById('gov-upload-type-help');
+
+    function updateGovUploadTypeHelp() {
+        if (!govUploadType || !govUploadTypeHelp) return;
+        const type = govUploadType.value;
+        const messageMap = {
+            photo: 'Photo: All images in the selected folder will be processed according to the configured Photo requirements.',
+            signature: 'Signature: All images in the selected folder will be processed according to the configured Signature requirements.',
+            thumb: 'Thumb Impression: All images in the selected folder will be processed according to the configured Thumb Impression requirements.'
+        };
+        govUploadTypeHelp.textContent = messageMap[type] || messageMap.photo;
+    }
+
+    if (govUploadType) {
+        govUploadType.addEventListener('change', updateGovUploadTypeHelp);
+    }
+
     if(govInput) {
         govInput.addEventListener('change', e => {
             handleGovFiles(e.target.files, true);
         });
     }
+
+    updateGovUploadTypeHelp();
 
         function generateGovernmentFilename(originalName, type) {
         if (!originalName) originalName = "";
@@ -749,6 +901,10 @@
         if (type === 'photo' || type === 'person-photo') suffix = " Photo";
         if (type === 'signature') suffix = " Sign";
         if (type === 'thumb' || type === 'thumb-impression') suffix = " Thumb";
+        if (type === 'document') {
+            if (!shortName) return 'Document.pdf';
+            return shortName + ' Document.pdf';
+        }
         if (!shortName) return suffix.trim() + '.jpg';
         return shortName + suffix + '.jpg';
     }
@@ -1075,19 +1231,51 @@
         const c = configs.find(x => x.id === configId);
         const fd = new FormData();
         fd.append('image', file);
-        fd.append('width', c.defaults.width);
-        fd.append('height', c.defaults.height);
-        fd.append('targetSize', c.defaults.targetSize);
-        fd.append('threshold', c.defaults.threshold);
-        fd.append('ideal', c.defaults.ideal);
-        fd.append('dpi', c.defaults.dpi);
-        fd.append('resizeAlgorithm', c.defaults.algo);
+        fd.append('documentType', configId === 'document' ? 'consent_form' : configId);
+
+        if (Number.isFinite(c.defaults.width)) {
+            fd.append('width', c.defaults.width);
+        }
+        if (Number.isFinite(c.defaults.height)) {
+            fd.append('height', c.defaults.height);
+        }
+
+        const targetKb = Number.isFinite(c.defaults.targetKb)
+            ? c.defaults.targetKb
+            : Number(c.defaults.maxSize ?? 45);
+        const thresholdKb = configId === 'document'
+            ? targetKb
+            : Math.max(1, (Number.isFinite(c.defaults.maxSize) ? c.defaults.maxSize : targetKb) + 5);
+        const idealKb = configId === 'document'
+            ? Math.max(1, targetKb - 1)
+            : Math.max(1, (Number.isFinite(c.defaults.maxSize) ? c.defaults.maxSize : targetKb) - 1);
+
+        fd.append('targetSize', targetKb);
+        fd.append('threshold', thresholdKb);
+        fd.append('ideal', idealKb);
+
+        if (Number.isFinite(c.defaults.dpi)) {
+            fd.append('dpi', c.defaults.dpi);
+        }
+        if (c.defaults.algo) {
+            fd.append('resizeAlgorithm', c.defaults.algo);
+        }
 
         const res = await fetch(API_URL, { method: 'POST', body: fd });
-        if(!res.ok) throw new Error("API Error");
-                const status = res.headers.get('X-Compression-Status');
-                if (status === 'below_minimum') throw new Error("File size below minimum");
-                if (status === 'exceeds_maximum') throw new Error("File size exceeds maximum");
+        if (!res.ok) {
+            let body = '';
+            try {
+                body = await res.text();
+                body = body.replace(/\s+/g, ' ').trim().slice(0, 256);
+            } catch (e) {
+                body = '';
+            }
+            const statusDetail = res.status ? `${res.status}${res.statusText ? ' ' + res.statusText : ''}` : 'Unknown status';
+            throw new Error(`API Error — ${statusDetail}${body ? ` — ${body}` : ''}`);
+        }
+        const status = res.headers.get('X-Compression-Status');
+        if (status === 'below_minimum') throw new Error('File size below minimum');
+        if (status === 'exceeds_maximum') throw new Error('File size exceeds maximum');
         return await res.blob();
     }
     
