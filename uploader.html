@@ -1779,7 +1779,7 @@
                 if (c.processed.sign) folder.file(getZipFilename(c.name, 'sign'), c.processed.sign);
                 if (c.processed.thumb) folder.file(getZipFilename(c.name, 'thumb'), c.processed.thumb);
                 if (c.processed.consent) folder.file(getZipFilename(c.name, 'consent'), c.processed.consent);
-            }
+             }
         });
         
         const content = await zip.generateAsync({ type: "blob" });
