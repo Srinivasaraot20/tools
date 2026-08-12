@@ -226,7 +226,7 @@
     <div class="row mb-5">
         <div class="col-12">
             <div class="upload-card shadow-lg border-primary border-2" style="height: auto;">
-                <h4 class="fw-bold mb-3 text-primary"><span class="material-icons-round align-text-bottom me-2">folder_copy</span>Batch Candidate Processing</h4>
+                <h4 class="fw-bold mb-3 text-primary"><span class="material-icons-round align-text-bottom me-2">folder_copy</span>older_copyBatch Candidate Processing</h4>
                 <p class="text-muted">Process multiple candidates at once by uploading their folders. The system will automatically detect the Photo, Signature, Thumb Impression, and Consent Form files in each candidate folder.</p>
                 <p class="mb-3"><a href="/static/Batch_Candidate_Processing_Workflow(1).pdf" target="_blank" class="link-primary">Download the batch candidate workflow</a></p>
                 
@@ -396,7 +396,7 @@
         { id: 'person-photo', title: '1. Upload Person Photo', shortName: 'Person Photo', suffix: ' Photo.jpg', defaults: { width: 132, height: 170, minSize: 10, maxSize: 50, dpi: 270, format: 'JPEG', algo: 'Lanczos3' } },
         { id: 'signature', title: '2. Upload Signature', shortName: 'Signature', suffix: ' Sign.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
         { id: 'thumb-impression', title: '3. Upload Thumb Impression', shortName: 'Thumb Impression', suffix: ' Thumb.jpg', defaults: { width: 170, height: 132, minSize: 5, maxSize: 20, dpi: 180, format: 'JPEG', algo: 'Lanczos3' } },
-        { id: 'document', title: '4. Upload Consent Form', shortName: 'Consent Form', kind: 'document', suffix: ' Document.pdf', defaults: { maxInputMb: 2, targetKb: 45, minKb: 20, maxKb: 50, format: 'PDF' } }
+        { id: 'document', title: '4. Upload Consent Form', shortName: 'Consent Form', kind: 'document', suffix: ' Form.pdf', defaults: { maxInputMb: 2, targetKb: 45, minKb: 20, maxKb: 50, format: 'PDF' } }
     ];
 
     const state = {};
